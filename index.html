@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediTone — Procedural Meditation Music Generator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --violet: rgba(139, 92, 246, 1);
+      --violet-dim: rgba(139, 92, 246, 0.25);
+    }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: radial-gradient(ellipse 120% 90% at 20% 10%, #1a0840 0%, #0b0825 35%, #040214 70%, #010109 100%);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Breathing orb ────────────────────────────── */
+    @keyframes breathe-scale {
+      0%   { transform: scale(0.93); }
+      42%  { transform: scale(1.13); }
+      58%  { transform: scale(1.13); }
+      100% { transform: scale(0.93); }
+    }
+    @keyframes breathe-glow {
+      0%   { box-shadow: 0 0 28px 4px rgba(100,30,220,0.30), 0 0 70px 18px rgba(70,20,190,0.10); }
+      42%  { box-shadow: 0 0 70px 24px rgba(139,92,246,0.55), 0 0 130px 50px rgba(99,60,240,0.22); }
+      58%  { box-shadow: 0 0 70px 24px rgba(139,92,246,0.55), 0 0 130px 50px rgba(99,60,240,0.22); }
+      100% { box-shadow: 0 0 28px 4px rgba(100,30,220,0.30), 0 0 70px 18px rgba(70,20,190,0.10); }
+    }
+    .orb-playing {
+      animation:
+        breathe-scale 8s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
+        breathe-glow  8s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+    }
+    .orb-idle {
+      box-shadow: 0 0 28px 4px rgba(70,20,180,0.25), 0 0 60px 14px rgba(50,10,160,0.08);
+      animation: none;
+    }
+
+    /* ── Pulse rings ──────────────────────────────── */
+    @keyframes ring-expand {
+      0%   { transform: scale(1);   opacity: 0.45; }
+      100% { transform: scale(1.65); opacity: 0; }
+    }
+    .ring-anim-1 { animation: ring-expand 4.0s ease-out infinite; }
+    .ring-anim-2 { animation: ring-expand 4.0s ease-out 2.0s infinite; }
+
+    /* ── Breath label ─────────────────────────────── */
+    @keyframes breath-label {
+      0%   { opacity: 0.22; }
+      42%  { opacity: 0.88; }
+      58%  { opacity: 0.88; }
+      100% { opacity: 0.22; }
+    }
+    .label-playing { animation: breath-label 8s ease-in-out infinite; }
+
+    /* ── Status dot ───────────────────────────────── */
+    @keyframes dot-live {
+      0%, 100% { opacity: 1;   box-shadow: 0 0 4px  rgba(139,92,246,0.6); }
+      50%       { opacity: 0.4; box-shadow: 0 0 10px rgba(139,92,246,1.0); }
+    }
+    .dot-live { animation: dot-live 2s ease-in-out infinite; }
+
+    /* ── Play button ──────────────────────────────── */
+    .play-btn {
+      transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s;
+    }
+    .play-btn:hover  { transform: scale(1.07); }
+    .play-btn:active { transform: scale(0.96); }
+
+    /* ── Glass card ───────────────────────────────── */
+    .glass {
+      background: rgba(12, 6, 36, 0.62);
+      border: 1px solid rgba(139, 92, 246, 0.11);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+    }
+
+    /* ── Volume sliders ───────────────────────────── */
+    .zslider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 3px;
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+      transition: height 0.15s;
+    }
+    .zslider:hover { height: 5px; }
+
+    /* Thumb — WebKit */
+    .zslider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      border: none;
+      cursor: grab;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .zslider::-webkit-slider-thumb:hover   { transform: scale(1.35); }
+    .zslider::-webkit-slider-thumb:active  { cursor: grabbing; }
+
+    /* Thumb — Firefox */
+    .zslider::-moz-range-thumb {
+      width: 14px; height: 14px;
+      border-radius: 50%; border: none;
+      cursor: grab;
+    }
+
+    /* Per-track colours with CSS custom-property fill trick */
+    .zslider.t-pad {
+      background: linear-gradient(to right, #7c3aed var(--v,70%), rgba(124,58,237,0.18) var(--v,70%));
+    }
+    .zslider.t-pad::-webkit-slider-thumb { background:#7c3aed; box-shadow:0 0 8px rgba(124,58,237,0.8); }
+    .zslider.t-pad::-moz-range-thumb     { background:#7c3aed; }
+
+    .zslider.t-wave {
+      background: linear-gradient(to right, #0e7490 var(--v,55%), rgba(14,116,144,0.18) var(--v,55%));
+    }
+    .zslider.t-wave::-webkit-slider-thumb { background:#0e7490; box-shadow:0 0 8px rgba(14,116,144,0.8); }
+    .zslider.t-wave::-moz-range-thumb     { background:#0e7490; }
+
+    .zslider.t-bell {
+      background: linear-gradient(to right, #b45309 var(--v,50%), rgba(180,83,9,0.18) var(--v,50%));
+    }
+    .zslider.t-bell::-webkit-slider-thumb { background:#d97706; box-shadow:0 0 8px rgba(217,119,6,0.8); }
+    .zslider.t-bell::-moz-range-thumb     { background:#d97706; }
+
+    .zslider.t-bin {
+      background: linear-gradient(to right, #047857 var(--v,40%), rgba(4,120,87,0.18) var(--v,40%));
+    }
+    .zslider.t-bin::-webkit-slider-thumb { background:#059669; box-shadow:0 0 8px rgba(5,150,105,0.8); }
+    .zslider.t-bin::-moz-range-thumb     { background:#059669; }
+  </style>
+</head>
+
+<body class="min-h-screen flex flex-col items-center justify-center p-4 select-none">
+
+  <!-- ── Starfield ────────────────────────────────── -->
+  <canvas id="starCanvas" class="fixed inset-0 pointer-events-none" style="z-index:0;"></canvas>
+
+  <!-- ── Main card ────────────────────────────────── -->
+  <div class="relative z-10 w-full max-w-sm glass rounded-3xl px-6 pt-8 pb-7 flex flex-col items-center gap-5 shadow-2xl">
+
+    <!-- Brand -->
+    <div class="text-center space-y-0.5">
+      <p class="text-xs tracking-[0.4em] uppercase font-light" style="color:rgba(167,139,250,0.45);">Procedural</p>
+      <h1 class="text-[2.1rem] font-light tracking-wide"
+          style="font-family:'Crimson Text',serif;color:rgba(240,235,255,0.92);text-shadow:0 0 28px rgba(139,92,246,0.5);">
+        MediTone
+      </h1>
+      <p class="text-xs tracking-[0.22em] uppercase" style="color:rgba(100,90,140,0.7);">Meditation Music Generator</p>
+    </div>
+
+    <!-- Breathing orb -->
+    <div class="relative flex items-center justify-center" style="width:196px;height:196px;">
+      <!-- Pulse rings (visible when playing) -->
+      <div id="ring1"
+           class="absolute rounded-full border pointer-events-none"
+           style="width:186px;height:186px;border-color:rgba(139,92,246,0.22);opacity:0;transition:opacity 1.2s;"></div>
+      <div id="ring2"
+           class="absolute rounded-full border pointer-events-none"
+           style="width:186px;height:186px;border-color:rgba(99,60,230,0.15);opacity:0;transition:opacity 1.2s;"></div>
+
+      <!-- Orb -->
+      <div id="orb" class="orb-idle rounded-full overflow-hidden relative"
+           style="width:172px;height:172px;
+                  background:radial-gradient(circle at 36% 34%,
+                    rgba(149,100,255,0.55) 0%,
+                    rgba(99,55,230,0.42) 32%,
+                    rgba(45,15,130,0.78) 62%,
+                    rgba(8,4,28,0.97) 100%);">
+
+        <!-- Waveform canvas overlay -->
+        <canvas id="orbCanvas" width="172" height="172"
+                class="absolute inset-0" style="border-radius:50%;"></canvas>
+
+        <!-- Centre labels -->
+        <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none gap-0.5">
+          <span id="breathLabel"
+                class="text-xs tracking-[0.32em] uppercase font-light"
+                style="color:rgba(200,180,255,0.3);">Begin</span>
+          <span id="noteLabel"
+                class="text-xs transition-opacity duration-700"
+                style="color:rgba(167,139,250,0.0); font-size:0.6rem; letter-spacing:0.12em;">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Guide text -->
+    <p id="breathGuide"
+       class="text-xs tracking-[0.25em] uppercase -mt-1 transition-all duration-1000"
+       style="color:rgba(167,139,250,0); letter-spacing:0.24em;">
+      follow the orb · breathe gently
+    </p>
+
+    <!-- Play / Pause -->
+    <button id="playBtn"
+            aria-label="Play / Pause"
+            class="play-btn relative rounded-full flex items-center justify-center
+                   border border-purple-700/40 text-purple-300
+                   hover:border-purple-500/60 hover:text-purple-200"
+            style="width:64px;height:64px;
+                   background:radial-gradient(circle at 38% 40%,rgba(109,40,217,0.38),rgba(22,8,60,0.78));
+                   box-shadow:0 0 22px rgba(109,40,217,0.28);">
+      <svg id="iconPlay"  class="w-6 h-6 relative" style="margin-left:3px;" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M8 5v14l11-7z"/>
+      </svg>
+      <svg id="iconPause" class="w-6 h-6 relative hidden" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+      </svg>
+    </button>
+
+    <!-- Status -->
+    <div class="flex items-center gap-2 -mt-1">
+      <span id="statusDot"
+            class="inline-block rounded-full transition-all duration-500"
+            style="width:7px;height:7px;background:#3f3660;"></span>
+      <span id="statusText"
+            class="text-xs tracking-widest uppercase transition-colors duration-500"
+            style="color:rgba(100,90,140,0.7);">Tap to Begin</span>
+    </div>
+
+    <!-- Divider -->
+    <div class="w-full" style="border-top:1px solid rgba(139,92,246,0.07);"></div>
+
+    <!-- Mixer -->
+    <div class="w-full space-y-4">
+      <p class="text-center text-xs tracking-[0.28em] uppercase mb-4"
+         style="color:rgba(100,90,140,0.65);">Sound Mixer</p>
+
+      <!-- Ambient Pad -->
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="rounded-full inline-block" style="width:6px;height:6px;background:rgba(167,139,250,0.65);flex-shrink:0;"></span>
+            <span class="text-sm font-light" style="color:rgba(210,200,255,0.8);">Ambient Pad</span>
+          </div>
+          <span style="font-size:0.58rem;letter-spacing:0.12em;color:rgba(100,90,140,0.55);" class="uppercase">Drone · Poly</span>
+        </div>
+        <input id="sliderPad" type="range" class="zslider t-pad" min="-40" max="0" value="-12" step="0.5" style="--v:70%;">
+      </div>
+
+      <!-- Ocean Waves -->
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="rounded-full inline-block" style="width:6px;height:6px;background:rgba(34,211,238,0.65);flex-shrink:0;"></span>
+            <span class="text-sm font-light" style="color:rgba(210,200,255,0.8);">Ocean Waves</span>
+          </div>
+          <span style="font-size:0.58rem;letter-spacing:0.12em;color:rgba(100,90,140,0.55);" class="uppercase">Pink Noise · LFO</span>
+        </div>
+        <input id="sliderWave" type="range" class="zslider t-wave" min="-40" max="0" value="-18" step="0.5" style="--v:55%;">
+      </div>
+
+      <!-- Zen Chimes -->
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="rounded-full inline-block" style="width:6px;height:6px;background:rgba(251,191,36,0.65);flex-shrink:0;"></span>
+            <span class="text-sm font-light" style="color:rgba(210,200,255,0.8);">Zen Chimes</span>
+          </div>
+          <span style="font-size:0.58rem;letter-spacing:0.12em;color:rgba(100,90,140,0.55);" class="uppercase">Metal Synth · Reverb</span>
+        </div>
+        <input id="sliderBell" type="range" class="zslider t-bell" min="-40" max="0" value="-20" step="0.5" style="--v:50%;">
+      </div>
+
+      <!-- Binaural Beats -->
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="rounded-full inline-block" style="width:6px;height:6px;background:rgba(52,211,153,0.65);flex-shrink:0;"></span>
+            <span class="text-sm font-light" style="color:rgba(210,200,255,0.8);">Binaural Beats</span>
+          </div>
+          <span style="font-size:0.58rem;letter-spacing:0.12em;color:rgba(100,90,140,0.55);" class="uppercase">4 Hz · Theta</span>
+        </div>
+        <input id="sliderBinaural" type="range" class="zslider t-bin" min="-40" max="0" value="-24" step="0.5" style="--v:40%;">
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <p class="text-center leading-relaxed" style="font-size:0.67rem;color:rgba(80,70,110,0.6);">
+      Headphones recommended for binaural effect<br>
+      <span style="color:rgba(60,55,90,0.55);">All sound mathematically generated · no samples</span>
+    </p>
+  </div>
+
+  <!-- ── Audio Engine + Visuals ──────────────────────────────────────────── -->
+  <script>
+  "use strict";
+  /* ═══════════════════════════════════════════════════════════════
+     MEDITONE — Audio Engine
+     Every sound is procedurally generated via Tone.js / Web Audio.
+     No external audio files, samples, or MP3s are used.
+  ═══════════════════════════════════════════════════════════════ */
+
+  /* ── State ─────────────────────────────────────── */
+  const S = {
+    playing: false,
+    ready:   false,
+    chordIdx: 0,
+    liveNotes: [],
+    chordTimer: null,
+    bellTimer:  null,
+    orbAnimId:  null,
+  };
+
+  /* ── Tone.js node references ───────────────────── */
+  let masterGain, masterComp, analyser;
+  let padVol, padSynth, padReverb, padChorus;
+  let waveVol, oceanNoise, waveGain, waveBpf, waveLpf, waveLFO1, waveLFO2;
+  let bellVol, bellSynth, bellReverb;
+  let binVol, leftPan, rightPan, leftOsc, rightOsc;
+
+  /* ── Musical constants ─────────────────────────── */
+  // Modal chord progression in A minor / Dorian — deeply meditative voicings
+  const CHORDS = [
+    ['A1', 'E2', 'A2', 'C3', 'E3', 'A3'],   // Am  (root)
+    ['G1', 'D2', 'G2', 'B2', 'D3', 'G3'],   // G   (VII)
+    ['F1', 'C2', 'F2', 'A2', 'C3', 'F3'],   // F   (VI)
+    ['E1', 'B1', 'E2', 'G2', 'B2', 'E3'],   // Em  (V minor)
+    ['D1', 'A1', 'D2', 'F2', 'A2', 'D3'],   // Dm  (IV)
+    ['C1', 'G1', 'C2', 'E2', 'G2', 'C3'],   // C   (III)
+  ];
+  const CHORD_NAMES = ['Am', 'G', 'F', 'Em', 'Dm', 'C'];
+
+  // Bell pitches — pentatonic high register
+  const BELL_NOTES = ['C5','D5','E5','G5','A5','B5','C6','D6','E6'];
+
+  /* ═══════════════════════════════════════════════
+     INIT AUDIO — called once on first user gesture
+  ═══════════════════════════════════════════════ */
+  async function initAudio() {
+    if (S.ready) return;
+
+    await Tone.start();
+
+    /* ── Master output chain ─────────────────────── */
+    masterComp = new Tone.Compressor({ threshold: -16, ratio: 4, attack: 0.08, release: 0.25 });
+    masterGain = new Tone.Gain(1);
+    masterGain.chain(masterComp, Tone.Destination);
+
+    /* Analyser tapped after compressor for visuals */
+    analyser = new Tone.Analyser('waveform', 512);
+    masterComp.connect(analyser);
+
+    /* ── 1. AMBIENT PAD ──────────────────────────── */
+    // PolySynth with triangle8 (rich triangle harmonics), long envelope
+    padVol    = new Tone.Volume(-12).connect(masterGain);
+    padChorus = new Tone.Chorus({ frequency: 0.28, delayTime: 3.8, depth: 0.45, wet: 0.45 })
+                    .connect(padVol)
+                    .start();
+    padReverb = new Tone.Reverb({ decay: 8, preDelay: 0.08, wet: 0.6 }).connect(padChorus);
+
+    padSynth  = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'triangle8' },
+      envelope: { attack: 5, decay: 3, sustain: 0.62, release: 9 },
+      volume: -8,
+    }).connect(padReverb);
+
+    await padReverb.ready;
+
+    /* ── 2. OCEAN WAVES ─────────────────────────── */
+    // Pink noise → bandpass sweep (LFO1) → lowpass rumble → amplitude swell (LFO2)
+    waveVol  = new Tone.Volume(-18).connect(masterGain);
+    waveLpf  = new Tone.Filter({ frequency: 900, type: 'lowpass',  rolloff: -24 }).connect(waveVol);
+    waveBpf  = new Tone.Filter({ frequency: 260, type: 'bandpass', Q: 0.9 }).connect(waveLpf);
+
+    // LFO1: sweeps the bandpass centre frequency (slow wave cresting)
+    waveLFO1 = new Tone.LFO({ frequency: 0.065, min: 70, max: 620, type: 'sine' });
+    waveLFO1.connect(waveBpf.frequency);
+
+    // LFO2: modulates overall wave amplitude (swell / recession)
+    waveGain = new Tone.Gain(0.65).connect(waveBpf);
+    waveLFO2 = new Tone.LFO({ frequency: 0.11, min: 0.25, max: 0.85, type: 'sine' });
+    waveLFO2.connect(waveGain.gain);
+
+    oceanNoise = new Tone.Noise('pink').connect(waveGain);
+
+    /* ── 3. ZEN BELL / CHIME ────────────────────── */
+    bellVol    = new Tone.Volume(-20).connect(masterGain);
+    bellReverb = new Tone.Reverb({ decay: 7, preDelay: 0.04, wet: 0.82 }).connect(bellVol);
+
+    bellSynth  = new Tone.MetalSynth({
+      frequency: 400,
+      envelope: { attack: 0.001, decay: 2.8, release: 0.4 },
+      harmonicity: 5.1,
+      modulationIndex: 14,
+      resonance: 3600,
+      octaves: 2.2,
+    }).connect(bellReverb);
+
+    await bellReverb.ready;
+
+    /* ── 4. BINAURAL BEATS ───────────────────────── */
+    // Left: 200 Hz  |  Right: 204 Hz  →  4 Hz Theta-wave difference tone
+    binVol    = new Tone.Volume(-24).connect(masterGain);
+    leftPan   = new Tone.Panner(-1).connect(binVol);   // full left
+    rightPan  = new Tone.Panner( 1).connect(binVol);   // full right
+    leftOsc   = new Tone.Oscillator({ frequency: 200, type: 'sine' }).connect(leftPan);
+    rightOsc  = new Tone.Oscillator({ frequency: 204, type: 'sine' }).connect(rightPan);
+
+    S.ready = true;
+    bindSliders();
+  }
+
+  /* ═══════════════════════════════════════════════
+     START / STOP
+  ═══════════════════════════════════════════════ */
+  function startSounds() {
+    // Fade-in master gain
+    masterGain.gain.setValueAtTime(0, Tone.now());
+    masterGain.gain.rampTo(1, 2.2);
+
+    // Ocean waves
+    oceanNoise.start();
+    waveLFO1.start();
+    waveLFO2.start();
+
+    // Binaural oscillators
+    leftOsc.start();
+    rightOsc.start();
+
+    // First chord immediately, then schedule progression
+    triggerChord(true);
+    S.chordTimer = setInterval(() => triggerChord(false), 14000);
+
+    // First bell after 12–20 s
+    scheduleBell(12000 + Math.random() * 8000);
+  }
+
+  function stopSounds() {
+    // Soft master fade-out
+    masterGain.gain.rampTo(0, 2.8);
+
+    // Silence sources after fade
+    const stopDelay = 2900;
+    setTimeout(() => {
+      if (!S.playing) { // still stopped
+        oceanNoise.stop();
+        waveLFO1.stop();
+        waveLFO2.stop();
+        leftOsc.stop();
+        rightOsc.stop();
+        if (S.liveNotes.length) {
+          S.liveNotes.forEach(n => { try { padSynth.triggerRelease(n); } catch(_){} });
+          S.liveNotes = [];
+        }
+      }
+    }, stopDelay);
+
+    clearInterval(S.chordTimer);
+    clearTimeout(S.bellTimer);
+    S.chordTimer = null;
+    S.bellTimer  = null;
+  }
+
+  /* ═══════════════════════════════════════════════
+     CHORD ENGINE
+  ═══════════════════════════════════════════════ */
+  function triggerChord(isFirst) {
+    const notes = CHORDS[S.chordIdx % CHORDS.length];
+    const name  = CHORD_NAMES[S.chordIdx % CHORD_NAMES.length];
+
+    if (!isFirst && S.liveNotes.length) {
+      // Release previous chord (envelope handles the slow fade)
+      S.liveNotes.forEach(n => { try { padSynth.triggerRelease(n); } catch(_){} });
+    }
+
+    // Small gap for natural breath between chords (skipped on very first chord)
+    const gap = isFirst ? 80 : 1400;
+    setTimeout(() => {
+      if (!S.playing) return;
+      notes.forEach(n => padSynth.triggerAttack(n));
+      S.liveNotes = [...notes];
+
+      // Flash chord name in orb
+      const el = document.getElementById('noteLabel');
+      if (el) {
+        el.textContent = name;
+        el.style.color = 'rgba(167,139,250,0.5)';
+        setTimeout(() => { el.style.color = 'rgba(167,139,250,0)'; }, 5500);
+      }
+    }, gap);
+
+    S.chordIdx++;
+  }
+
+  /* ═══════════════════════════════════════════════
+     BELL SCHEDULER
+  ═══════════════════════════════════════════════ */
+  function scheduleBell(overrideDelay) {
+    const delay = overrideDelay !== undefined
+      ? overrideDelay
+      : 15000 + Math.random() * 15000; // 15–30 s
+
+    S.bellTimer = setTimeout(() => {
+      if (!S.playing) return;
+      const freq = Tone.Frequency(BELL_NOTES[Math.floor(Math.random() * BELL_NOTES.length)]).toFrequency();
+      bellSynth.frequency.value = freq;
+      bellSynth.triggerAttackRelease('8n');
+      scheduleBell(); // reschedule
+    }, delay);
+  }
+
+  /* ═══════════════════════════════════════════════
+     TOGGLE PLAY / PAUSE
+  ═══════════════════════════════════════════════ */
+  async function togglePlay() {
+    if (!S.ready) {
+      setStatus('loading', 'Initializing…');
+      await initAudio();
+    }
+
+    if (!S.playing) {
+      S.playing = true;
+      startSounds();
+      applyPlayUI(true);
+      setStatus('active', 'Playing');
+    } else {
+      S.playing = false;
+      stopSounds();
+      applyPlayUI(false);
+      setStatus('idle', 'Paused');
+    }
+  }
+
+  /* ═══════════════════════════════════════════════
+     SLIDER BINDINGS
+  ═══════════════════════════════════════════════ */
+  function bindSliders() {
+    [
+      ['sliderPad',      padVol,  'pad'],
+      ['sliderWave',     waveVol, 'wave'],
+      ['sliderBell',     bellVol, 'bell'],
+      ['sliderBinaural', binVol,  'bin'],
+    ].forEach(([id, volNode, _cls]) => {
+      const el = document.getElementById(id);
+      function sync() {
+        volNode.volume.rampTo(parseFloat(el.value), 0.05);
+        // Update CSS fill
+        const pct = ((parseFloat(el.value) + 40) / 40 * 100).toFixed(1) + '%';
+        el.style.setProperty('--v', pct);
+      }
+      el.addEventListener('input', sync);
+      sync();
+    });
+  }
+
+  /* ═══════════════════════════════════════════════
+     UI HELPERS
+  ═══════════════════════════════════════════════ */
+  function applyPlayUI(playing) {
+    /* Icons */
+    document.getElementById('iconPlay').classList.toggle('hidden', playing);
+    document.getElementById('iconPause').classList.toggle('hidden', !playing);
+
+    /* Orb class */
+    const orb = document.getElementById('orb');
+    orb.classList.remove('orb-idle', 'orb-playing');
+    orb.classList.add(playing ? 'orb-playing' : 'orb-idle');
+
+    /* Pulse rings */
+    ['ring1','ring2'].forEach((id, i) => {
+      const el = document.getElementById(id);
+      el.style.opacity = playing ? '1' : '0';
+      el.classList.remove('ring-anim-1','ring-anim-2');
+      if (playing) el.classList.add(i === 0 ? 'ring-anim-1' : 'ring-anim-2');
+    });
+
+    /* Breath label */
+    const lbl = document.getElementById('breathLabel');
+    lbl.textContent = playing ? 'Breathe' : 'Begin';
+    lbl.classList.toggle('label-playing', playing);
+    lbl.style.color = playing ? '' : 'rgba(200,180,255,0.3)';
+
+    /* Guide text */
+    const guide = document.getElementById('breathGuide');
+    guide.style.color = playing ? 'rgba(167,139,250,0.42)' : 'rgba(167,139,250,0)';
+  }
+
+  function setStatus(type, text) {
+    const dot = document.getElementById('statusDot');
+    const lbl = document.getElementById('statusText');
+    lbl.textContent = text;
+
+    dot.className = 'inline-block rounded-full transition-all duration-500';
+    if (type === 'active') {
+      dot.style.cssText = 'width:7px;height:7px;background:#8b5cf6;';
+      dot.classList.add('dot-live');
+      lbl.style.color = 'rgba(167,139,250,0.7)';
+    } else if (type === 'loading') {
+      dot.style.cssText = 'width:7px;height:7px;background:#eab308;';
+      lbl.style.color   = 'rgba(234,179,8,0.7)';
+    } else {
+      dot.style.cssText = 'width:7px;height:7px;background:#3f3660;';
+      lbl.style.color   = 'rgba(100,90,140,0.7)';
+    }
+  }
+
+  /* ═══════════════════════════════════════════════
+     ORB CANVAS — waveform visualisation
+  ═══════════════════════════════════════════════ */
+  (function startOrbCanvas() {
+    const canvas = document.getElementById('orbCanvas');
+    const ctx    = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const cx = W / 2, cy = H / 2;
+    const BASE_R = 50;
+    let idleT = 0;
+
+    function draw() {
+      S.orbAnimId = requestAnimationFrame(draw);
+      ctx.clearRect(0, 0, W, H);
+
+      /* ── Idle ring (no audio) ─────────────────── */
+      if (!S.playing || !analyser) {
+        idleT += 0.008;
+        const a = 0.10 + 0.05 * Math.sin(idleT * 0.9);
+        const r = BASE_R + 1.5 * Math.sin(idleT * 0.7);
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(139,92,246,${a})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        return;
+      }
+
+      /* ── Active: circular waveform ───────────── */
+      const data = analyser.getValue(); // Float32Array, −1..1
+      const N = data.length;
+
+      // RMS for glow/amplitude
+      let rms = 0;
+      for (let i = 0; i < N; i++) rms += data[i] * data[i];
+      rms = Math.sqrt(rms / N);
+      const amp = Math.min(1, rms * 6);
+
+      ctx.save();
+
+      // Outer glow ring
+      const outerAlpha = 0.12 + amp * 0.25;
+      ctx.beginPath();
+      ctx.arc(cx, cy, BASE_R + 22, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(139,92,246,${outerAlpha})`;
+      ctx.lineWidth = 12 + amp * 8;
+      ctx.stroke();
+
+      // Waveform ring
+      ctx.beginPath();
+      for (let i = 0; i <= N; i++) {
+        const t  = (i / N) * Math.PI * 2 - Math.PI / 2;
+        const v  = data[i % N];
+        const r  = BASE_R + v * 30;
+        const x  = cx + r * Math.cos(t);
+        const y  = cy + r * Math.sin(t);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+
+      const waveAlpha = 0.35 + amp * 0.55;
+      const grad = ctx.createRadialGradient(cx, cy, BASE_R - 8, cx, cy, BASE_R + 36);
+      grad.addColorStop(0, `rgba(200,170,255,${waveAlpha})`);
+      grad.addColorStop(1, `rgba(99,60,230,0)`);
+      ctx.strokeStyle = grad;
+      ctx.lineWidth   = 1.5;
+      ctx.shadowBlur  = 10 + amp * 22;
+      ctx.shadowColor = 'rgba(139,92,246,0.75)';
+      ctx.stroke();
+
+      // Centre pulse dot
+      const dotR = 3 + amp * 14;
+      const dotG = ctx.createRadialGradient(cx, cy, 0, cx, cy, dotR);
+      dotG.addColorStop(0, `rgba(220,200,255,${0.35 + amp * 0.55})`);
+      dotG.addColorStop(1, 'rgba(139,92,246,0)');
+      ctx.beginPath();
+      ctx.arc(cx, cy, dotR, 0, Math.PI * 2);
+      ctx.fillStyle   = dotG;
+      ctx.shadowBlur  = 0;
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    draw();
+  })();
+
+  /* ═══════════════════════════════════════════════
+     STARFIELD CANVAS
+  ═══════════════════════════════════════════════ */
+  (function startStars() {
+    const canvas = document.getElementById('starCanvas');
+    const ctx    = canvas.getContext('2d');
+
+    const STARS = Array.from({ length: 210 }, () => ({
+      xr:    Math.random(),
+      yr:    Math.random(),
+      r:     Math.random() * 1.15 + 0.2,
+      base:  0.06 + Math.random() * 0.55,
+      speed: 0.0018 + Math.random() * 0.003,
+      phase: Math.random() * Math.PI * 2,
+    }));
+
+    function resize() {
+      canvas.width  = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function drawStars() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const t = performance.now() / 1000;
+      STARS.forEach(s => {
+        const a = s.base * (0.25 + 0.75 * (0.5 + 0.5 * Math.sin(t * s.speed * 6 + s.phase)));
+        ctx.beginPath();
+        ctx.arc(s.xr * canvas.width, s.yr * canvas.height, s.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(215,205,255,${a.toFixed(3)})`;
+        ctx.fill();
+      });
+      requestAnimationFrame(drawStars);
+    }
+    drawStars();
+  })();
+
+  /* ── Attach play button listener ───────────── */
+  document.getElementById('playBtn').addEventListener('click', togglePlay);
+  </script>
+</body>
+</html>
