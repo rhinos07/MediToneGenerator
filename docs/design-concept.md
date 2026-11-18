@@ -64,7 +64,7 @@ All existing controls stay; only their place changes.
 - **Water surface inside the bowl** shows concentric ripples (cymatics idea).
   - Idle: very slow, faint ripples.
   - Playing: ripple amplitude and rate follow the audio RMS from the existing analyser. A struck bowl (`bowl` layer event) sends one strong ring.
-- **Halo** behind the bowl breathes with a 9 s cycle (≈ 4 s in, 1 s hold, 4 s out).
+- **Breathing guide** (implemented): the cue text shows *breathe in / hold / breathe out*; halo and bowl grow while breathing in and sink while breathing out; a thin ring around the bowl fills during each step. Patterns: Calm 4–6 (default), 4–7–8, Box 4–4–4–4, Off. Optional quiet bowl chime at each in/out change (pitched to the session key). With the guide off, the halo breathes freely with a 9 s cycle.
 - Optional: tap on the bowl = play/pause (larger touch target than the button).
 
 ## 6. Colour palette

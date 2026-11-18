@@ -23,8 +23,7 @@
       --text:        rgba(246,231,200,0.92);
       --text-soft:   rgba(246,231,200,0.68);
       --text-faint:  rgba(246,231,200,0.46);
-      --glass-bg:    rgba(20,24,18,0.55);
-      --glass-line:  rgba(232,194,122,0.18);
+        --glass-line:  rgba(232,194,122,0.18);
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { min-height: 100%; }
@@ -51,7 +50,7 @@
     .brand p { font-size: 0.66rem; letter-spacing: 0.38em; text-transform: uppercase; color: var(--text-faint); }
 
     /* ── Singing bowl (hero) ── */
-    .bowl-wrap { position: relative; width: 300px; height: 262px; cursor: pointer; }
+    .bowl-wrap { position: relative; width: 300px; height: 262px; cursor: pointer; margin-bottom: 24px; }
     .bowl-wrap svg, #rippleCanvas { position: absolute; left: 0; top: 16px; }
     .halo {
       position: absolute; left: 20px; top: -4px; width: 260px; height: 260px; border-radius: 50%;
@@ -64,12 +63,25 @@
       45%,55% { transform: scale(1.12); opacity: 1; }
     }
     .cue {
-      position: absolute; bottom: -4px; width: 100%; text-align: center;
+      position: absolute; bottom: -30px; width: 100%; text-align: center;
       font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 1.15rem;
       color: var(--candle); text-shadow: 0 1px 8px rgba(0,0,0,0.65); opacity: 0.75;
     }
     .playing .cue { animation: cue 9s ease-in-out infinite; }
     @keyframes cue { 0%,100% { opacity: 0.35; } 45%,55% { opacity: 0.95; } }
+
+    /* Breathing guide: halo, bowl and cue are driven by JS (see breathGuide) */
+    .guided .halo, .guided .cue { animation: none; }
+    .guided .cue { opacity: 0.95; font-size: 1.3rem; letter-spacing: 0.04em; transition: opacity .6s; }
+    .guided .cue.fade { opacity: 0; }
+    #bowlSvg { transform-origin: 150px 150px; }
+    .guide-ring { position: absolute; left: 0; top: 0; pointer-events: none; opacity: 0; transition: opacity 1.5s; overflow: visible; }
+    .guided .guide-ring { opacity: 1; }
+    .guide-ring circle { fill: none; }
+    .guide-ring .track { stroke: rgba(246,231,200,0.10); stroke-width: 1; }
+    .guide-ring .prog  { stroke: var(--brass-light); stroke-width: 1.6; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(232,194,122,0.6)); }
+    .check { display: flex; align-items: center; gap: 0.6rem; font-size: 0.82rem; color: var(--text); margin-top: 0.8rem; cursor: pointer; }
+    .check input { accent-color: var(--brass); width: 16px; height: 16px; }
 
     /* ── Transport ── */
     .transport { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; }
@@ -98,8 +110,8 @@
     .presets { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; max-width: 520px; }
     .chip {
       font-size: 0.72rem; letter-spacing: 0.08em; padding: 0.45rem 0.95rem; border-radius: 999px; cursor: pointer;
-      color: var(--text-soft); background: rgba(20,24,18,0.5); border: 1px solid var(--glass-line);
-      -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); transition: background .3s, color .3s;
+      color: var(--text-soft); background: rgba(20,24,18,0.72); border: 1px solid var(--glass-line);
+      transition: background .3s, color .3s;
     }
     .chip:hover { color: var(--text); background: rgba(40,44,30,0.6); }
     .chip[aria-pressed="true"] { color: #2a1c0c; background: var(--brass-light); border-color: var(--brass-light); }
@@ -109,15 +121,13 @@
       position: fixed; left: 50%; bottom: 1.2rem; transform: translateX(-50%); z-index: 3;
       font-size: 0.68rem; letter-spacing: 0.26em; text-transform: uppercase; color: var(--text-soft);
       padding: 0.6rem 1.3rem; border-radius: 999px; cursor: pointer;
-      background: var(--glass-bg); border: 1px solid var(--glass-line);
-      -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+      background: rgba(20,24,18,0.75); border: 1px solid var(--glass-line);
     }
     .backdrop { position: fixed; inset: 0; z-index: 4; background: rgba(0,0,0,0.25); opacity: 0; pointer-events: none; transition: opacity .4s; }
     .backdrop.open { opacity: 1; pointer-events: auto; }
     .drawer {
       position: fixed; z-index: 5; right: 0; top: 0; bottom: 0; width: min(400px, 100vw);
-      background: rgba(16,20,15,0.82); border-left: 1px solid var(--glass-line);
-      -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px);
+      background: rgba(16,20,15,0.95); border-left: 1px solid var(--glass-line);
       padding: 1.6rem 1.5rem 2rem; overflow-y: auto; visibility: hidden;
       transform: translateX(105%); transition: transform .5s cubic-bezier(.2,.8,.2,1), visibility 0s .5s;
     }
@@ -189,6 +199,7 @@
     @media (prefers-reduced-motion: reduce) {
       .playing .halo, .playing .cue { animation: none; }
       .playing .halo { opacity: 0.8; transform: none; }
+      .guided .cue { transition: none; }
       .drawer, .drawer.open { transition: none; }
     }
   </style>
@@ -206,7 +217,11 @@
     <!-- Singing bowl: ripples on the water surface follow the audio. Click = play / pause. -->
     <div class="bowl-wrap" id="bowl" title="Play / Pause">
       <div class="halo"></div>
-      <svg width="300" height="230" viewBox="0 0 300 230" aria-hidden="true">
+      <svg class="guide-ring" width="300" height="262" viewBox="0 0 300 262" aria-hidden="true">
+        <circle class="track" cx="150" cy="126" r="124"/>
+        <circle class="prog" id="ringProg" cx="150" cy="126" r="124" transform="rotate(-90 150 126)"/>
+      </svg>
+      <svg id="bowlSvg" width="300" height="230" viewBox="0 0 300 230" aria-hidden="true">
         <defs>
           <linearGradient id="bowlBody" x1="0" x2="1">
             <stop offset="0" stop-color="#6b4320"/>
@@ -240,7 +255,7 @@
         </g>
       </svg>
       <canvas id="rippleCanvas" width="300" height="230" aria-hidden="true"></canvas>
-      <div class="cue" id="cue">tap the bowl to begin</div>
+      <div class="cue" id="cue" aria-live="polite">tap the bowl to begin</div>
     </div>
 
     <div class="transport">
@@ -274,6 +289,7 @@
         <button class="sc-night" data-scene="night">Candle night</button>
       </div>
       <p class="hint">The light follows the session: dawn while arriving, brightest in stillness, dusk at the end.</p>
+      <label class="check"><input type="checkbox" id="chkEco"> Eco mode · still scene, less CPU and battery</label>
     </section>
 
     <section class="group">
@@ -299,6 +315,20 @@
         </label>
       </div>
       <p class="hint">Same seed + same settings = same piece. Changes cross-fade while playing.</p>
+    </section>
+
+    <section class="group">
+      <div class="group-title">Breathing guide</div>
+      <label><span class="lbl">Pattern</span>
+        <select id="selBreath" class="field">
+          <option value="calm">Calm 4 – 6 · in 4 s, out 6 s</option>
+          <option value="478">4 – 7 – 8 · in 4 s, hold 7 s, out 8 s</option>
+          <option value="box">Box 4 – 4 – 4 – 4</option>
+          <option value="off">Off</option>
+        </select>
+      </label>
+      <label class="check"><input type="checkbox" id="chkChime"> Soft bowl chime at each change</label>
+      <p class="hint">The bowl and its light grow while you breathe in and sink while you breathe out. The ring fills up during each step.</p>
     </section>
 
     <section class="group">
@@ -339,6 +369,9 @@
   const E = window.MediToneEngine;
   const $ = id => document.getElementById(id);
   const MUTE = E.MUTE_DB;
+  const RENDER_SCALE = 0.5;      // scene canvas resolution relative to CSS pixels
+  const SCENE_FPS = 30;          // scene redraw rate (smooth enough for slow motion)
+  const ECO_INTERVAL = 2000;     // eco mode / reduced motion: redraw every 2 s
   const REDUCED_MOTION = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // Display order, colours and UI labels of the sound layers ("ocean" is shown as "Water")
@@ -380,6 +413,14 @@
       levels: { drone: -10, pad: -8, flute: -14, handpan: MUTE, bowl: -12, tanpura: MUTE, ocean: -24, binaural: -28 },
     },
   };
+  // Breathing patterns: steps of [kind, seconds]. kind = in | hold | out
+  const BREATH = {
+    calm: [['in', 4], ['out', 6]],
+    '478': [['in', 4], ['hold', 7], ['out', 8]],
+    box: [['in', 4], ['hold', 4], ['out', 4], ['hold', 4]],
+    off: null,
+  };
+  const BREATH_TEXT = { in: 'breathe in', hold: 'hold', out: 'breathe out' };
   const SEED_WORDS = ['lotus', 'river', 'cedar', 'dawn', 'mist', 'stone', 'cloud', 'ember', 'tide', 'moss', 'sky', 'reed'];
 
   /* ── State ─────────────────────────────────────── */
@@ -391,6 +432,7 @@
       movement: 0.5, density: 0.5, reverb: 0.6, beat: 4,
       levels: Object.assign({}, E.DEFAULT_LEVELS),
       scene: 'lake', preset: 'lakeCalm',
+      breath: 'calm', chime: false, eco: false,
     },
   };
 
@@ -411,6 +453,7 @@
       c.levels = Object.assign({}, E.DEFAULT_LEVELS, c.levels || {});
       Object.assign(S.cfg, c);
       if (!SCENES[S.cfg.scene]) S.cfg.scene = 'lake';
+      if (!BREATH[S.cfg.breath]) S.cfg.breath = 'calm';
     } catch (_) { /* ignore */ }
   }
 
@@ -477,6 +520,9 @@
       if (S.engine) S.engine.setParam('beat', S.cfg.beat);
       markCustom();
     });
+    $('selBreath').addEventListener('change', e => { S.cfg.breath = e.target.value; guide.restart(); saveSettings(); });
+    $('chkChime').addEventListener('change', e => { S.cfg.chime = e.target.checked; guide.restart(); saveSettings(); });
+    $('chkEco').addEventListener('change', e => { S.cfg.eco = e.target.checked; saveSettings(); });
     $('btnExport').addEventListener('click', exportWav);
     $('playBtn').addEventListener('click', togglePlay);
     $('bowl').addEventListener('click', togglePlay);
@@ -504,6 +550,9 @@
     $('selDuration').value = String(c.duration);
     $('inpSeed').value = c.seed;
     $('selBeat').value = c.beat;
+    $('selBreath').value = c.breath;
+    $('chkChime').checked = !!c.chime;
+    $('chkEco').checked = !!c.eco;
     for (const ch of CHARACTER) setSlider('ch-' + ch.key, c[ch.key]);
     for (const [key] of LAYER_UI) setSlider('mx-' + key, c.levels[key]);
     document.querySelectorAll('#presets .chip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.preset === c.preset)));
@@ -561,6 +610,7 @@
   function tick() {
     if (!S.engine) return;
     S.engine.advance(S.ctx.currentTime + lookahead());
+    guide.scheduleChimes(S.ctx.currentTime + lookahead());
     if (S.engine.status(S.ctx.currentTime).ended) finishSession();
   }
 
@@ -571,6 +621,7 @@
       S.playing = true; S.complete = false;
       startEngine(S.elapsed);
       S.loop = setInterval(tick, 500);
+      guide.start();
       applyPlayUI(true, 'Playing');
     } else {
       S.playing = false;
@@ -578,6 +629,7 @@
       if (S.engine) S.engine.stop(3);
       S.engine = null;
       clearInterval(S.loop);
+      guide.stop();
       applyPlayUI(false, 'Paused');
     }
   }
@@ -588,6 +640,7 @@
     S.playing = false;
     S.elapsed = 0; S.complete = true;
     clearInterval(S.loop);
+    guide.stop();
     applyPlayUI(false, 'Session complete');
   }
 
@@ -623,7 +676,7 @@
     $('iconPause').classList.toggle('hidden', !playing);
     $('playBtn').setAttribute('aria-label', playing ? 'Pause' : 'Play');
     $('stage').classList.toggle('playing', playing);
-    $('cue').textContent = playing ? 'breathe in … and let go' : (S.complete ? 'rest a moment' : 'tap the bowl to begin');
+    if (!playing || !guide.active()) $('cue').textContent = playing ? 'breathe in … and let go' : (S.complete ? 'rest a moment' : 'tap the bowl to begin');
     $('statusText').textContent = status;
   }
 
@@ -637,12 +690,17 @@
     return { ts: 0, p: null, phase: '' };
   }
 
-  let lastPhase = null;
+  let lastPhase = null, lastTime = null, lastBar = null;
   function updateTransport(info) {
-    const total = S.cfg.duration, active = S.playing || S.elapsed > 0;
-    $('timeText').textContent = active ? (isFinite(total) ? `${fmt(info.ts)} / ${fmt(total)}` : fmt(info.ts)) : '';
-    $('progress').style.visibility = active && isFinite(total) ? 'visible' : 'hidden';
-    $('progressFill').style.width = active && isFinite(total) ? (Math.min(1, info.ts / total) * 100).toFixed(2) + '%' : '0';
+    const total = S.cfg.duration, active = S.playing || S.elapsed > 0, bar = active && isFinite(total);
+    const time = active ? (isFinite(total) ? `${fmt(info.ts)} / ${fmt(total)}` : fmt(info.ts)) : '';
+    if (time !== lastTime) { lastTime = time; $('timeText').textContent = time; }
+    const width = bar ? (Math.min(1, info.ts / total) * 100).toFixed(1) + '%' : '0';
+    if (width + bar !== lastBar) {
+      lastBar = width + bar;
+      $('progress').style.visibility = bar ? 'visible' : 'hidden';
+      $('progressFill').style.width = width;
+    }
     const phase = active ? info.phase : '';
     if (phase !== lastPhase) {
       lastPhase = phase;
@@ -719,7 +777,10 @@
     const rnd = (a, b) => a + Math.random() * (b - a);
 
     function build() {
-      W = c.width = innerWidth; H = c.height = innerHeight;
+      W = innerWidth; H = innerHeight;
+      // Render at half resolution: 4x fewer pixels to fill, the soft scene looks the same when scaled up
+      c.width = Math.ceil(W * RENDER_SCALE); c.height = Math.ceil(H * RENDER_SCALE);
+      g.setTransform(RENDER_SCALE, 0, 0, RENDER_SCALE, 0, 0);
       trees = [];
       [[0.45, 'rgba(120,120,70,0.35)', 14, 6, 14], [0.7, 'rgba(55,65,40,0.65)', 9, 12, 26], [1, 'rgba(20,28,20,0.92)', 6, 22, 46]]
         .forEach(([depth, col, n, wMin, wMax]) => {
@@ -887,6 +948,118 @@
     return (t, L) => SCENES[S.cfg.scene](t, L);
   })();
 
+  /* ── Breathing guide ───────────────────────────────
+     Clock = AudioContext time, so visuals and chimes stay in sync.
+     Chimes are scheduled ahead in tick() and still sound when the tab is hidden. */
+  const guide = (function () {
+    const CIRC = 2 * Math.PI * 124;
+    const ring = $('ringProg'), halo = document.querySelector('.halo'), bowl = $('bowlSvg'), cue = $('cue');
+    let t0 = 0, running = false, nextChime = 0, chimes = [], lastStep = -1;
+    ring.style.strokeDasharray = CIRC.toFixed(1);
+    ring.style.strokeDashoffset = CIRC.toFixed(1);
+
+    const pattern = () => BREATH[S.cfg.breath];
+    const cycleLen = pat => pat.reduce((a, s) => a + s[1], 0);
+    const ease = x => 0.5 - 0.5 * Math.cos(Math.PI * x);
+
+    // Step at time t: index, kind, progress in step, start time of step
+    function stepAt(t) {
+      const pat = pattern(), len = cycleLen(pat);
+      const n = Math.floor((t - t0) / len);
+      let local = (t - t0) - n * len, i = 0;
+      while (local >= pat[i][1]) { local -= pat[i][1]; i++; }
+      return { i: n * pat.length + i, kind: pat[i][0], x: local / pat[i][1], start: t - local };
+    }
+
+    // Short, quiet singing-bowl strike (same partial ratios as the engine's bowls)
+    function chime(t, kind) {
+      const midi = (kind === 'in' ? 72 : 67) + S.cfg.rootPc % 12;
+      const f = 440 * Math.pow(2, (midi - 69) / 12);
+      const ctx = S.ctx, sum = ctx.createGain();
+      sum.gain.value = 0.045;
+      sum.connect(S.out.input);
+      [[1, 1, 4.5], [2.71, 0.35, 2.5], [5.15, 0.12, 1.2]].forEach(([r, a, t60], k) => {
+        for (const df of [0, 0.6 + k * 0.5]) {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.frequency.value = f * r + df;
+          g.gain.setValueAtTime(0, t);
+          g.gain.linearRampToValueAtTime(a * 0.5, t + 0.006);
+          g.gain.setTargetAtTime(0, t + 0.01, t60 / 6.9);
+          o.connect(g); g.connect(sum);
+          o.start(t); o.stop(t + t60 + 0.2);
+          chimes.push({ o, t });
+        }
+      });
+    }
+
+    function clearChimes() {
+      const now = S.ctx ? S.ctx.currentTime : 0;
+      chimes.forEach(c => { if (c.t > now) try { c.o.stop(); } catch (_) { /* ignore */ } });
+      chimes = [];
+    }
+
+    function scheduleChimes(until) {
+      if (!running || !S.cfg.chime || !pattern()) return;
+      const now = S.ctx.currentTime;
+      chimes = chimes.filter(c => c.t > now - 10);
+      if (nextChime < now) nextChime = stepAt(now).start + pattern()[stepAt(now).i % pattern().length][1];
+      let guard = 0;
+      while (nextChime < until && guard++ < 200) {
+        const st = stepAt(nextChime + 1e-6);
+        if (st.kind !== 'hold') chime(nextChime, st.kind);
+        nextChime = st.start + pattern()[st.i % pattern().length][1];
+      }
+    }
+
+    function reset() {
+      halo.style.transform = ''; halo.style.opacity = ''; bowl.style.transform = '';
+      ring.style.strokeDashoffset = CIRC.toFixed(1);
+      cue.classList.remove('fade');
+      $('stage').classList.remove('guided');
+      lastStep = -1;
+    }
+
+    return {
+      active: () => running && !!pattern(),
+      start() {
+        running = true; clearChimes();
+        t0 = S.ctx.currentTime + 0.8;     // first chime / step shortly after play
+        nextChime = t0;
+        if (pattern()) $('stage').classList.add('guided');
+        scheduleChimes(S.ctx.currentTime + lookahead());
+      },
+      stop() { running = false; clearChimes(); reset(); },
+      restart() {
+        if (!running) return;
+        this.stop(); this.start();
+        if (!pattern()) applyPlayUI(true, 'Playing');
+      },
+      scheduleChimes,
+      // Called every animation frame
+      frame() {
+        if (!running || !pattern() || !S.ctx) return;
+        const now = S.ctx.currentTime;
+        if (now < t0) { cue.textContent = BREATH_TEXT.in; return; }
+        const st = stepAt(now);
+        // fullness of the lungs: 0 = empty, 1 = full
+        const full = st.kind === 'in' ? ease(st.x) : st.kind === 'out' ? 1 - ease(st.x)
+          : (pattern()[(st.i - 1 + pattern().length) % pattern().length][0] === 'in' ? 1 : 0);
+        if (!REDUCED_MOTION) {
+          halo.style.transform = `scale(${(0.88 + 0.28 * full).toFixed(4)})`;
+          bowl.style.transform = `scale(${(1 + 0.035 * full).toFixed(4)})`;
+        }
+        halo.style.opacity = (0.4 + 0.6 * full).toFixed(3);
+        ring.style.strokeDashoffset = (CIRC * (1 - st.x)).toFixed(1);
+        if (st.i !== lastStep) {
+          lastStep = st.i;
+          cue.textContent = BREATH_TEXT[st.kind];
+        }
+        // fade the text out shortly before the step ends, in again with the new step
+        cue.classList.toggle('fade', st.x > 0.9 && pattern()[st.i % pattern().length][1] > 2);
+      },
+    };
+  })();
+
   /* ── Main animation loop ───────────────────────── */
   (function loop() {
     let light = targetLight(null), lastScene = 0;
@@ -896,9 +1069,11 @@
       updateTransport(info);
       readLevel();
       ripples(now);
+      guide.frame();
       light += (targetLight(info.p) - light) * 0.01;   // smooth, slow change of light
-      // reduced motion: redraw the scene only every 2 s
-      if (REDUCED_MOTION && now - lastScene < 2000) return;
+      // limit scene redraws; eco mode and reduced motion redraw only every 2 s
+      const interval = (REDUCED_MOTION || S.cfg.eco) ? ECO_INTERVAL : 1000 / SCENE_FPS;
+      if (now - lastScene < interval - 2) return;
       lastScene = now;
       sceneRenderer(now / 1000, light);
     }
