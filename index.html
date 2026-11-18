@@ -4,241 +4,332 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MediTone — Generative Meditation Music</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="theme-color" content="#0f1712">
   <script src="engine.js"></script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,400&family=Inter:wght@300;400;500&display=swap');
 
+    /* ── Design tokens (see docs/design-concept.md) ── */
+    :root {
+      --forest-deep: #0f1712;
+      --forest:      #1d2a20;
+      --sage:        #9fae8a;
+      --brass:       #c9973f;
+      --brass-light: #e8c27a;
+      --bronze:      #8a5a2b;
+      --candle:      #f6e7c8;
+      --sunlight:    #ffd79a;
+      --lavender:    #a990c9;
+      --text:        rgba(246,231,200,0.92);
+      --text-soft:   rgba(246,231,200,0.68);
+      --text-faint:  rgba(246,231,200,0.46);
+      --glass-bg:    rgba(20,24,18,0.55);
+      --glass-line:  rgba(232,194,122,0.18);
+    }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
+    html, body { min-height: 100%; }
     body {
-      font-family: 'Inter', system-ui, sans-serif;
-      background: radial-gradient(ellipse 120% 90% at 20% 10%, #1a0840 0%, #0b0825 35%, #040214 70%, #010109 100%);
-      min-height: 100vh;
-      overflow-x: hidden;
-      color: rgba(210,200,255,0.8);
+      font-family: 'Inter', system-ui, sans-serif; color: var(--text);
+      background: var(--forest-deep); overflow-x: hidden; -webkit-user-select: none; user-select: none;
+    }
+    button, select, input { font: inherit; }
+    :focus-visible { outline: 2px solid var(--brass-light); outline-offset: 3px; }
+    #scene { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; }
+
+    .stage {
+      position: relative; z-index: 1; min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 1.3rem; padding: 2rem 1rem 6.5rem;
     }
 
-    /* ── Breathing orb ────────────────────────────── */
-    @keyframes breathe-scale {
-      0%   { transform: scale(0.93); }
-      42%  { transform: scale(1.13); }
-      58%  { transform: scale(1.13); }
-      100% { transform: scale(0.93); }
+    /* Brand */
+    .brand { text-align: center; }
+    .brand h1 {
+      font-family: 'Cormorant Garamond', serif; font-weight: 300; font-size: 2.8rem; letter-spacing: 0.06em;
+      color: var(--candle); text-shadow: 0 0 30px rgba(255,215,154,0.35), 0 2px 10px rgba(0,0,0,0.4);
     }
-    @keyframes breathe-glow {
-      0%   { box-shadow: 0 0 28px 4px rgba(100,30,220,0.30), 0 0 70px 18px rgba(70,20,190,0.10); }
-      42%  { box-shadow: 0 0 70px 24px rgba(139,92,246,0.55), 0 0 130px 50px rgba(99,60,240,0.22); }
-      58%  { box-shadow: 0 0 70px 24px rgba(139,92,246,0.55), 0 0 130px 50px rgba(99,60,240,0.22); }
-      100% { box-shadow: 0 0 28px 4px rgba(100,30,220,0.30), 0 0 70px 18px rgba(70,20,190,0.10); }
-    }
-    .orb-playing {
-      animation:
-        breathe-scale 8s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
-        breathe-glow  8s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
-    }
-    .orb-idle {
-      box-shadow: 0 0 28px 4px rgba(70,20,180,0.25), 0 0 60px 14px rgba(50,10,160,0.08);
-      animation: none;
-    }
+    .brand p { font-size: 0.66rem; letter-spacing: 0.38em; text-transform: uppercase; color: var(--text-faint); }
 
-    @keyframes ring-expand {
-      0%   { transform: scale(1);   opacity: 0.45; }
-      100% { transform: scale(1.65); opacity: 0; }
+    /* ── Singing bowl (hero) ── */
+    .bowl-wrap { position: relative; width: 300px; height: 262px; cursor: pointer; }
+    .bowl-wrap svg, #rippleCanvas { position: absolute; left: 0; top: 16px; }
+    .halo {
+      position: absolute; left: 20px; top: -4px; width: 260px; height: 260px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,215,154,0.30) 0%, rgba(255,215,154,0.08) 40%, transparent 70%);
+      transform: scale(0.92); opacity: 0.45; transition: opacity 2s;
     }
-    .ring-anim-1 { animation: ring-expand 4.0s ease-out infinite; }
-    .ring-anim-2 { animation: ring-expand 4.0s ease-out 2.0s infinite; }
+    .playing .halo { animation: breathe 9s ease-in-out infinite; }
+    @keyframes breathe {
+      0%,100% { transform: scale(0.92); opacity: 0.55; }
+      45%,55% { transform: scale(1.12); opacity: 1; }
+    }
+    .cue {
+      position: absolute; bottom: -4px; width: 100%; text-align: center;
+      font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 1.15rem;
+      color: var(--candle); text-shadow: 0 1px 8px rgba(0,0,0,0.65); opacity: 0.75;
+    }
+    .playing .cue { animation: cue 9s ease-in-out infinite; }
+    @keyframes cue { 0%,100% { opacity: 0.35; } 45%,55% { opacity: 0.95; } }
 
-    @keyframes breath-label {
-      0%   { opacity: 0.22; }
-      42%  { opacity: 0.88; }
-      58%  { opacity: 0.88; }
-      100% { opacity: 0.22; }
+    /* ── Transport ── */
+    .transport { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; }
+    .play {
+      width: 72px; height: 72px; border-radius: 50%; border: 1px solid rgba(232,194,122,0.55); cursor: pointer;
+      color: #2a1c0c; display: grid; place-items: center;
+      background: radial-gradient(circle at 35% 30%, #f3d496 0%, var(--brass) 45%, var(--bronze) 100%);
+      box-shadow: 0 0 0 6px rgba(232,194,122,0.08), 0 8px 30px rgba(201,151,63,0.35), inset 0 -4px 10px rgba(0,0,0,0.25);
+      transition: transform .25s cubic-bezier(.34,1.56,.64,1);
     }
-    .label-playing { animation: breath-label 8s ease-in-out infinite; }
+    .play:hover { transform: scale(1.06); }
+    .play:active { transform: scale(0.96); }
+    .play svg { width: 26px; height: 26px; }
+    #iconPlay { margin-left: 4px; }
+    .hidden { display: none !important; }
+    .status { font-size: 0.68rem; letter-spacing: 0.26em; text-transform: uppercase; color: var(--text-soft); text-shadow: 0 1px 6px rgba(0,0,0,0.6); }
+    .time { font-variant-numeric: tabular-nums; font-size: 0.8rem; letter-spacing: 0.12em; color: var(--text-soft); min-height: 1em; text-shadow: 0 1px 6px rgba(0,0,0,0.6); }
+    .progress { width: 220px; height: 2px; border-radius: 2px; background: rgba(246,231,200,0.14); overflow: hidden; }
+    .progress i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--brass), var(--sunlight)); transition: width 1s linear; }
+    .phases { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem 1.1rem;
+      font-size: 0.6rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--text-faint); text-shadow: 0 1px 6px rgba(0,0,0,0.6); }
+    .phases span { transition: color 1.5s; }
+    .phases span.on { color: var(--brass-light); }
 
-    @keyframes dot-live {
-      0%, 100% { opacity: 1;   box-shadow: 0 0 4px  rgba(139,92,246,0.6); }
-      50%       { opacity: 0.4; box-shadow: 0 0 10px rgba(139,92,246,1.0); }
+    /* ── Presets ── */
+    .presets { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; max-width: 520px; }
+    .chip {
+      font-size: 0.72rem; letter-spacing: 0.08em; padding: 0.45rem 0.95rem; border-radius: 999px; cursor: pointer;
+      color: var(--text-soft); background: rgba(20,24,18,0.5); border: 1px solid var(--glass-line);
+      -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); transition: background .3s, color .3s;
     }
-    .dot-live { animation: dot-live 2s ease-in-out infinite; }
+    .chip:hover { color: var(--text); background: rgba(40,44,30,0.6); }
+    .chip[aria-pressed="true"] { color: #2a1c0c; background: var(--brass-light); border-color: var(--brass-light); }
 
-    .play-btn { transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s; }
-    .play-btn:hover  { transform: scale(1.07); }
-    .play-btn:active { transform: scale(0.96); }
-
-    .glass {
-      background: rgba(12, 6, 36, 0.62);
-      border: 1px solid rgba(139, 92, 246, 0.11);
-      backdrop-filter: blur(28px);
-      -webkit-backdrop-filter: blur(28px);
+    /* ── Settings drawer ── */
+    .drawer-btn {
+      position: fixed; left: 50%; bottom: 1.2rem; transform: translateX(-50%); z-index: 3;
+      font-size: 0.68rem; letter-spacing: 0.26em; text-transform: uppercase; color: var(--text-soft);
+      padding: 0.6rem 1.3rem; border-radius: 999px; cursor: pointer;
+      background: var(--glass-bg); border: 1px solid var(--glass-line);
+      -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
     }
-
-    /* ── Sliders (colour via --c, fill via --v) ───── */
-    .zslider {
-      -webkit-appearance: none; appearance: none;
-      width: 100%; height: 3px; border-radius: 3px; outline: none; cursor: pointer;
-      transition: height 0.15s;
-      background: linear-gradient(to right, var(--c) var(--v,50%), color-mix(in srgb, var(--c) 18%, transparent) var(--v,50%));
+    .backdrop { position: fixed; inset: 0; z-index: 4; background: rgba(0,0,0,0.25); opacity: 0; pointer-events: none; transition: opacity .4s; }
+    .backdrop.open { opacity: 1; pointer-events: auto; }
+    .drawer {
+      position: fixed; z-index: 5; right: 0; top: 0; bottom: 0; width: min(400px, 100vw);
+      background: rgba(16,20,15,0.82); border-left: 1px solid var(--glass-line);
+      -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px);
+      padding: 1.6rem 1.5rem 2rem; overflow-y: auto; visibility: hidden;
+      transform: translateX(105%); transition: transform .5s cubic-bezier(.2,.8,.2,1), visibility 0s .5s;
     }
-    .zslider:hover { height: 5px; }
-    .zslider::-webkit-slider-thumb {
-      -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; border: none; cursor: grab;
-      background: var(--c); box-shadow: 0 0 8px var(--c); transition: transform 0.15s;
+    .drawer.open { transform: translateX(0); visibility: visible; transition: transform .5s cubic-bezier(.2,.8,.2,1); }
+    .drawer h2 {
+      font-family: 'Cormorant Garamond', serif; font-weight: 400; font-size: 1.5rem; color: var(--candle);
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;
     }
-    .zslider::-webkit-slider-thumb:hover { transform: scale(1.35); }
-    .zslider::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; border: none; background: var(--c); cursor: grab; }
-
-    .section-title {
-      font-size: 0.68rem; letter-spacing: 0.28em; text-transform: uppercase;
-      color: rgba(100,90,140,0.75); text-align: center;
+    .drawer h2 button { background: none; border: 0; color: var(--text-faint); font-size: 1.5rem; line-height: 1; cursor: pointer; padding: 0 0.3rem; }
+    .group { margin-bottom: 1.6rem; }
+    .group-title {
+      font-size: 0.62rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--brass-light);
+      margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.6rem;
     }
+    .group-title::after { content: ''; flex: 1; height: 1px; background: var(--glass-line); }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
+    .lbl { display: block; font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-faint); margin-bottom: 0.3rem; }
     .field {
-      background: rgba(20,10,50,0.6); border: 1px solid rgba(139,92,246,0.18);
-      color: rgba(220,210,255,0.9); border-radius: 0.6rem; padding: 0.35rem 0.5rem;
-      font-size: 0.8rem; width: 100%; outline: none;
+      width: 100%; font-size: 0.82rem; color: var(--text); padding: 0.45rem 0.6rem; border-radius: 0.7rem;
+      background: rgba(246,231,200,0.05); border: 1px solid var(--glass-line); outline: none;
     }
-    .field:focus { border-color: rgba(139,92,246,0.5); }
-    .field option { background: #120a30; }
-    .lbl { font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(130,115,180,0.75); }
-    .sub { font-size: 0.58rem; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(100,90,140,0.55); }
-    .btn-soft {
-      border: 1px solid rgba(139,92,246,0.3); border-radius: 0.6rem; padding: 0.4rem 0.8rem;
-      font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase;
-      color: rgba(200,185,255,0.85); background: rgba(60,30,140,0.25); transition: background 0.2s;
+    .field:focus { border-color: rgba(232,194,122,0.5); }
+    .field option { background: var(--forest); }
+    .seed { display: flex; gap: 0.4rem; }
+    .icon-btn {
+      flex: none; width: 2.1rem; border-radius: 0.7rem; cursor: pointer; color: var(--candle);
+      background: rgba(201,151,63,0.16); border: 1px solid rgba(232,194,122,0.35);
     }
-    .btn-soft:hover { background: rgba(90,50,190,0.35); }
-    .btn-soft:disabled { opacity: 0.4; cursor: wait; }
-    details > summary { list-style: none; cursor: pointer; }
-    details > summary::-webkit-details-marker { display: none; }
+    .hint { font-size: 0.64rem; color: var(--text-faint); margin-top: 0.6rem; line-height: 1.5; }
+    .row { margin-bottom: 0.95rem; }
+    .row-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; margin-bottom: 0.4rem; }
+    .row-head b { font-weight: 400; font-size: 0.86rem; color: var(--text); display: flex; align-items: center; gap: 0.5rem; }
+    .row-head b i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); box-shadow: 0 0 6px var(--c); }
+    .row-head small { font-size: 0.6rem; color: var(--text-faint); letter-spacing: 0.06em; text-align: right; }
+    input[type=range] {
+      -webkit-appearance: none; appearance: none; width: 100%; height: 3px; border-radius: 3px; outline: none; cursor: pointer;
+      background: linear-gradient(to right, var(--c) var(--v,50%), rgba(246,231,200,0.12) var(--v,50%));
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--forest-deep);
+      background: radial-gradient(circle at 35% 30%, #f6dca6, var(--brass)); box-shadow: 0 0 8px rgba(232,194,122,0.6); cursor: grab;
+    }
+    input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border-radius: 50%; background: var(--brass); border: 2px solid var(--forest-deep); cursor: grab; }
+    .beat-row { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; margin-top: -0.2rem; }
+    .beat-row .field { width: auto; }
+    .btn {
+      font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; cursor: pointer;
+      padding: 0.6rem 1rem; border-radius: 0.8rem; color: var(--candle); width: 100%;
+      background: rgba(201,151,63,0.16); border: 1px solid rgba(232,194,122,0.35);
+    }
+    .btn:hover { background: rgba(201,151,63,0.26); }
+    .btn:disabled { opacity: 0.45; cursor: wait; }
+    .scene-pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+    .scene-pick button {
+      height: 58px; border-radius: 0.7rem; border: 1px solid var(--glass-line); cursor: pointer; text-align: left;
+      font-size: 0.58rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--candle);
+      display: flex; align-items: flex-end; padding: 0.35rem 0.45rem; text-shadow: 0 1px 4px rgba(0,0,0,0.7);
+    }
+    .scene-pick button[aria-pressed="true"] { outline: 2px solid var(--brass-light); outline-offset: 2px; }
+    .sc-lake  { background: linear-gradient(180deg, #3d5a73 0%, #f3cf8f 48%, #ffe2a8 50%, #1e3640 100%); }
+    .sc-grove { background: linear-gradient(160deg, #f4c27a 0%, #6b6a3c 45%, #1d2a20 100%); }
+    .sc-night { background: linear-gradient(160deg, #3b2f5c 0%, #1a1730 55%, #0b0a14 100%); }
+    .foot { font-size: 0.64rem; color: var(--text-faint); text-align: center; line-height: 1.6; margin-top: 1rem; }
+
+    @media (max-height: 720px) {
+      .stage { gap: 0.9rem; padding-top: 1.2rem; }
+      .brand h1 { font-size: 2.2rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .playing .halo, .playing .cue { animation: none; }
+      .playing .halo { opacity: 0.8; transform: none; }
+      .drawer, .drawer.open { transition: none; }
+    }
   </style>
 </head>
 
-<body class="min-h-screen flex flex-col items-center justify-center p-4 select-none">
+<body>
+  <canvas id="scene" aria-hidden="true"></canvas>
 
-  <canvas id="starCanvas" class="fixed inset-0 pointer-events-none" style="z-index:0;"></canvas>
+  <main class="stage" id="stage">
+    <header class="brand">
+      <h1>MediTone</h1>
+      <p>Generative meditation sound</p>
+    </header>
 
-  <div class="relative z-10 w-full max-w-md glass rounded-3xl px-6 pt-8 pb-7 flex flex-col items-center gap-5 shadow-2xl my-6">
-
-    <!-- Brand -->
-    <div class="text-center space-y-0.5">
-      <p class="text-xs tracking-[0.4em] uppercase font-light" style="color:rgba(167,139,250,0.45);">Generative</p>
-      <h1 class="text-[2.1rem] font-light tracking-wide"
-          style="font-family:'Crimson Text',serif;color:rgba(240,235,255,0.92);text-shadow:0 0 28px rgba(139,92,246,0.5);">
-        MediTone
-      </h1>
-      <p class="text-xs tracking-[0.22em] uppercase" style="color:rgba(100,90,140,0.7);">Meditation Music Generator</p>
+    <!-- Singing bowl: ripples on the water surface follow the audio. Click = play / pause. -->
+    <div class="bowl-wrap" id="bowl" title="Play / Pause">
+      <div class="halo"></div>
+      <svg width="300" height="230" viewBox="0 0 300 230" aria-hidden="true">
+        <defs>
+          <linearGradient id="bowlBody" x1="0" x2="1">
+            <stop offset="0" stop-color="#6b4320"/>
+            <stop offset="0.28" stop-color="#c9973f"/>
+            <stop offset="0.45" stop-color="#f3d496"/>
+            <stop offset="0.62" stop-color="#b9842f"/>
+            <stop offset="1" stop-color="#4e3015"/>
+          </linearGradient>
+          <radialGradient id="bowlInner" cx="0.5" cy="0.4" r="0.7">
+            <stop offset="0" stop-color="#3a2a14"/>
+            <stop offset="0.7" stop-color="#7a5524"/>
+            <stop offset="1" stop-color="#d7a957"/>
+          </radialGradient>
+          <radialGradient id="cushion" cx="0.5" cy="0.3" r="0.7">
+            <stop offset="0" stop-color="#7b3b2a"/>
+            <stop offset="1" stop-color="#3a1a12"/>
+          </radialGradient>
+        </defs>
+        <ellipse cx="150" cy="208" rx="120" ry="14" fill="rgba(0,0,0,0.45)"/>
+        <ellipse cx="150" cy="190" rx="98" ry="22" fill="url(#cushion)"/>
+        <path d="M46 92 C 50 160, 95 192, 150 192 C 205 192, 250 160, 254 92 Z" fill="url(#bowlBody)"/>
+        <path d="M58 122 C 90 140, 210 140, 242 122" stroke="rgba(60,35,10,0.45)" stroke-width="1.2" fill="none"/>
+        <path d="M62 130 C 95 147, 205 147, 238 130" stroke="rgba(255,225,160,0.25)" stroke-width="0.8" fill="none"/>
+        <ellipse cx="150" cy="92" rx="106" ry="30" fill="#e6bd72"/>
+        <ellipse cx="150" cy="92" rx="104" ry="28" fill="url(#bowlInner)"/>
+        <path d="M84 110 C 88 150, 110 172, 128 178" stroke="rgba(255,240,205,0.5)" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <g transform="rotate(-28 232 60)">
+          <rect x="200" y="54" width="92" height="11" rx="5.5" fill="#8a5a2b"/>
+          <rect x="200" y="54" width="34" height="11" rx="5.5" fill="#5b3a1d"/>
+          <rect x="270" y="55" width="22" height="9" rx="4.5" fill="rgba(255,230,180,0.25)"/>
+        </g>
+      </svg>
+      <canvas id="rippleCanvas" width="300" height="230" aria-hidden="true"></canvas>
+      <div class="cue" id="cue">tap the bowl to begin</div>
     </div>
 
-    <!-- Breathing orb -->
-    <div class="relative flex items-center justify-center" style="width:196px;height:196px;">
-      <div id="ring1" class="absolute rounded-full border pointer-events-none"
-           style="width:186px;height:186px;border-color:rgba(139,92,246,0.22);opacity:0;transition:opacity 1.2s;"></div>
-      <div id="ring2" class="absolute rounded-full border pointer-events-none"
-           style="width:186px;height:186px;border-color:rgba(99,60,230,0.15);opacity:0;transition:opacity 1.2s;"></div>
-      <div id="orb" class="orb-idle rounded-full overflow-hidden relative"
-           style="width:172px;height:172px;
-                  background:radial-gradient(circle at 36% 34%,
-                    rgba(149,100,255,0.55) 0%, rgba(99,55,230,0.42) 32%,
-                    rgba(45,15,130,0.78) 62%, rgba(8,4,28,0.97) 100%);">
-        <canvas id="orbCanvas" width="172" height="172" class="absolute inset-0" style="border-radius:50%;"></canvas>
-        <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none gap-0.5">
-          <span id="breathLabel" class="text-xs tracking-[0.32em] uppercase font-light"
-                style="color:rgba(200,180,255,0.3);">Begin</span>
-          <span id="phaseLabel" class="transition-opacity duration-700"
-                style="color:rgba(167,139,250,0.55); font-size:0.6rem; letter-spacing:0.16em; text-transform:uppercase;"></span>
-        </div>
+    <div class="transport">
+      <button class="play" id="playBtn" aria-label="Play">
+        <svg id="iconPlay" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        <svg id="iconPause" class="hidden" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+      </button>
+      <div class="status" id="statusText" aria-live="polite">Ready</div>
+      <div class="time" id="timeText"></div>
+      <div class="progress" id="progress"><i id="progressFill"></i></div>
+      <div class="phases" id="phases">
+        <span data-phase="Arriving">Arriving</span><span data-phase="Deepening">Deepening</span>
+        <span data-phase="Stillness">Stillness</span><span data-phase="Returning">Returning</span>
       </div>
     </div>
 
-    <p id="breathGuide" class="text-xs tracking-[0.25em] uppercase -mt-1 transition-all duration-1000"
-       style="color:rgba(167,139,250,0);">follow the orb · breathe gently</p>
+    <nav class="presets" id="presets" aria-label="Presets"></nav>
+  </main>
 
-    <!-- Play / Pause -->
-    <button id="playBtn" aria-label="Play / Pause"
-            class="play-btn relative rounded-full flex items-center justify-center border border-purple-700/40 text-purple-300 hover:border-purple-500/60 hover:text-purple-200"
-            style="width:64px;height:64px;background:radial-gradient(circle at 38% 40%,rgba(109,40,217,0.38),rgba(22,8,60,0.78));box-shadow:0 0 22px rgba(109,40,217,0.28);">
-      <svg id="iconPlay" class="w-6 h-6 relative" style="margin-left:3px;" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-      <svg id="iconPause" class="w-6 h-6 relative hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-    </button>
+  <button class="drawer-btn" id="drawerBtn" aria-controls="drawer" aria-expanded="false">⚙ Settings</button>
+  <div class="backdrop" id="backdrop"></div>
 
-    <div class="flex flex-col items-center gap-1 -mt-1">
-      <div class="flex items-center gap-2">
-        <span id="statusDot" class="inline-block rounded-full transition-all duration-500" style="width:7px;height:7px;background:#3f3660;"></span>
-        <span id="statusText" class="text-xs tracking-widest uppercase transition-colors duration-500" style="color:rgba(100,90,140,0.7);">Tap to Begin</span>
+  <aside class="drawer" id="drawer" aria-label="Settings">
+    <h2>Settings <button id="drawerClose" aria-label="Close settings">×</button></h2>
+
+    <section class="group">
+      <div class="group-title">Scene</div>
+      <div class="scene-pick" id="scenePick">
+        <button class="sc-lake"  data-scene="lake">Mountain lake</button>
+        <button class="sc-grove" data-scene="grove">Forest grove</button>
+        <button class="sc-night" data-scene="night">Candle night</button>
       </div>
-      <span id="timeText" class="text-xs tabular-nums" style="color:rgba(130,115,180,0.6);letter-spacing:0.1em;"></span>
-    </div>
+      <p class="hint">The light follows the session: dawn while arriving, brightest in stillness, dusk at the end.</p>
+    </section>
 
-    <div class="w-full" style="border-top:1px solid rgba(139,92,246,0.07);"></div>
-
-    <!-- Session -->
-    <div class="w-full space-y-3">
-      <p class="section-title">Session</p>
-      <div class="grid grid-cols-2 gap-3">
-        <label class="space-y-1 block"><span class="lbl">Duration</span>
+    <section class="group">
+      <div class="group-title">Session</div>
+      <div class="grid2">
+        <label><span class="lbl">Duration</span>
           <select id="selDuration" class="field">
             <option value="600">10 min</option>
             <option value="1200">20 min</option>
-            <option value="1800" selected>30 min</option>
+            <option value="1800">30 min</option>
             <option value="2700">45 min</option>
             <option value="3600">60 min</option>
             <option value="Infinity">Endless</option>
           </select>
         </label>
-        <label class="space-y-1 block"><span class="lbl">Mood / Mode</span>
-          <select id="selMode" class="field"></select>
-        </label>
-        <label class="space-y-1 block"><span class="lbl">Key</span>
-          <select id="selRoot" class="field"></select>
-        </label>
-        <label class="space-y-1 block"><span class="lbl">Seed</span>
-          <div class="flex gap-1.5">
+        <label><span class="lbl">Mood / Mode</span><select id="selMode" class="field"></select></label>
+        <label><span class="lbl">Key</span><select id="selRoot" class="field"></select></label>
+        <label><span class="lbl">Seed</span>
+          <span class="seed">
             <input id="inpSeed" class="field" type="text" spellcheck="false">
-            <button id="btnDice" class="btn-soft" style="padding:0.3rem 0.55rem;" title="New random seed" aria-label="New random seed">⟳</button>
-          </div>
+            <button id="btnDice" class="icon-btn" title="New random seed" aria-label="New random seed">⟳</button>
+          </span>
         </label>
       </div>
-      <p class="text-center" style="font-size:0.62rem;color:rgba(90,80,130,0.7);">Same seed + same settings = same piece. Changes cross-fade while playing.</p>
-    </div>
+      <p class="hint">Same seed + same settings = same piece. Changes cross-fade while playing.</p>
+    </section>
 
-    <!-- Character -->
-    <div class="w-full space-y-3">
-      <p class="section-title">Character</p>
-      <div id="charRows" class="space-y-3"></div>
-    </div>
+    <section class="group">
+      <div class="group-title">Character</div>
+      <div id="charRows"></div>
+    </section>
 
-    <!-- Mixer -->
-    <details class="w-full" open>
-      <summary class="section-title mb-3">Sound Layers ▾</summary>
-      <div id="mixRows" class="space-y-3.5"></div>
-      <div class="flex items-center justify-between mt-3">
-        <span class="lbl">Binaural beat</span>
-        <select id="selBeat" class="field" style="width:auto;">
+    <section class="group">
+      <div class="group-title">Sound layers</div>
+      <div id="mixRows"></div>
+      <div class="beat-row">
+        <span class="lbl" style="margin:0;">Binaural beat</span>
+        <select id="selBeat" class="field">
           <option value="2">2 Hz · Delta</option>
-          <option value="4" selected>4 Hz · Theta</option>
+          <option value="4">4 Hz · Theta</option>
           <option value="6">6 Hz · Theta</option>
           <option value="8">8 Hz · Alpha</option>
           <option value="10">10 Hz · Alpha</option>
         </select>
       </div>
-    </details>
+      <p class="hint">Far left = off. Use headphones for the binaural layer.</p>
+    </section>
 
-    <div class="w-full" style="border-top:1px solid rgba(139,92,246,0.07);"></div>
+    <section class="group">
+      <div class="group-title">Export</div>
+      <button id="btnExport" class="btn">Render WAV</button>
+      <p id="exportText" class="hint" style="text-align:center;">Renders the session offline with the current settings (max 20 min).</p>
+    </section>
 
-    <!-- Export -->
-    <div class="w-full flex flex-col items-center gap-2">
-      <button id="btnExport" class="btn-soft">Render WAV</button>
-      <p id="exportText" class="text-center" style="font-size:0.62rem;color:rgba(90,80,130,0.75);">
-        Renders the session offline with the current settings (max 20 min).
-      </p>
-    </div>
-
-    <p class="text-center leading-relaxed" style="font-size:0.67rem;color:rgba(80,70,110,0.6);">
-      Headphones recommended for binaural effect<br>
-      <span style="color:rgba(60,55,90,0.55);">All sound generated in real time · no samples</span>
-    </p>
-  </div>
+    <p class="foot">All sound generated in real time · no samples</p>
+  </aside>
 
   <script>
   "use strict";
@@ -247,26 +338,59 @@
   ═══════════════════════════════════════════════════════════════ */
   const E = window.MediToneEngine;
   const $ = id => document.getElementById(id);
+  const MUTE = E.MUTE_DB;
+  const REDUCED_MOTION = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  const LAYER_COLORS = {
-    drone: '#6d28d9', pad: '#8b5cf6', flute: '#0ea5e9', handpan: '#14b8a6',
-    bowl: '#d97706', tanpura: '#e11d48', ocean: '#0e7490', binaural: '#059669',
-  };
-  const CHARACTER = [
-    { key: 'movement', label: 'Movement', sub: 'How often pad voices shift · 0 = static', color: '#a78bfa', def: 0.5 },
-    { key: 'density',  label: 'Density',  sub: 'How often melodies appear',               color: '#38bdf8', def: 0.5 },
-    { key: 'reverb',   label: 'Space',    sub: 'Hall reverb amount',                      color: '#818cf8', def: 0.6 },
+  // Display order, colours and UI labels of the sound layers ("ocean" is shown as "Water")
+  const LAYER_UI = [
+    ['bowl',     '#c9973f', 'Singing bowls', 'Struck · rubbed'],
+    ['drone',    '#8a5a2b', 'Drone',         'Root · fifth'],
+    ['pad',      '#9fae8a', 'Pad',           'Voice-led · halo'],
+    ['flute',    '#d7c49e', 'Flutes',        'Bansuri · shakuhachi'],
+    ['handpan',  '#7fa39a', 'Handpan',       'Modal synthesis'],
+    ['tanpura',  '#b0766a', 'Tanpura',       'Jawari drone'],
+    ['ocean',    '#6f8f9a', 'Water',         'Irregular swells'],
+    ['binaural', '#a990c9', 'Binaural',      'Headphones'],
   ];
+  const CHARACTER = [
+    { key: 'movement', label: 'Movement', sub: 'How often pad voices shift · 0 = static', color: '#e8c27a' },
+    { key: 'density',  label: 'Density',  sub: 'How often melodies appear',               color: '#9fae8a' },
+    { key: 'reverb',   label: 'Space',    sub: 'Hall reverb amount',                      color: '#a990c9' },
+  ];
+  // Presets set mode, character, layer levels and scene in one step. Key and seed stay.
+  const PRESETS = {
+    lakeCalm: {
+      label: 'Lake Calm', scene: 'lake', mode: 'dorian', movement: 0.5, density: 0.5, reverb: 0.6,
+      levels: { drone: -11, pad: -6, flute: -6, handpan: -10, bowl: -8, tanpura: MUTE, ocean: -26, binaural: -30 },
+    },
+    forestCalm: {
+      label: 'Forest Calm', scene: 'grove', mode: 'pentaMajor', movement: 0.5, density: 0.55, reverb: 0.55,
+      levels: { drone: -12, pad: -7, flute: -5, handpan: -10, bowl: -11, tanpura: MUTE, ocean: -24, binaural: -30 },
+    },
+    deepBowls: {
+      label: 'Deep Bowls', scene: 'lake', mode: 'aeolian', movement: 0.3, density: 0.3, reverb: 0.75,
+      levels: { drone: -9, pad: -12, flute: MUTE, handpan: MUTE, bowl: -4, tanpura: MUTE, ocean: -32, binaural: -30 },
+    },
+    waterBreath: {
+      label: 'Water Breath', scene: 'lake', mode: 'pentaMinor', movement: 0.35, density: 0.35, reverb: 0.7,
+      levels: { drone: -12, pad: -8, flute: -10, handpan: -14, bowl: -12, tanpura: MUTE, ocean: -16, binaural: -30 },
+    },
+    sleep: {
+      label: 'Sleep', scene: 'night', mode: 'pentaMinor', duration: 2700, movement: 0.2, density: 0.2, reverb: 0.8, beat: 2,
+      levels: { drone: -10, pad: -8, flute: -14, handpan: MUTE, bowl: -12, tanpura: MUTE, ocean: -24, binaural: -28 },
+    },
+  };
   const SEED_WORDS = ['lotus', 'river', 'cedar', 'dawn', 'mist', 'stone', 'cloud', 'ember', 'tide', 'moss', 'sky', 'reed'];
 
   /* ── State ─────────────────────────────────────── */
   const S = {
     ctx: null, out: null, engine: null,
-    playing: false, elapsed: 0, loop: null,
+    playing: false, elapsed: 0, loop: null, complete: false,
     cfg: {
       seed: randomSeed(), rootPc: 2, mode: 'dorian', duration: 1800,
       movement: 0.5, density: 0.5, reverb: 0.6, beat: 4,
       levels: Object.assign({}, E.DEFAULT_LEVELS),
+      scene: 'lake', preset: 'lakeCalm',
     },
   };
 
@@ -286,74 +410,124 @@
       c.duration = Number(c.duration);
       c.levels = Object.assign({}, E.DEFAULT_LEVELS, c.levels || {});
       Object.assign(S.cfg, c);
+      if (!SCENES[S.cfg.scene]) S.cfg.scene = 'lake';
     } catch (_) { /* ignore */ }
   }
 
   /* ── Build controls ────────────────────────────── */
+  const sliders = {};
   function sliderRow(container, { id, label, sub, color, min, max, step, value }) {
     const row = document.createElement('div');
-    row.className = 'space-y-1.5';
+    row.className = 'row';
+    row.style.setProperty('--c', color);
     row.innerHTML = `
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <span class="rounded-full inline-block" style="width:6px;height:6px;background:${color};flex-shrink:0;"></span>
-          <span class="text-sm font-light" style="color:rgba(210,200,255,0.8);">${label}</span>
-        </div>
-        <span class="sub">${sub}</span>
-      </div>
-      <input id="${id}" type="range" class="zslider" min="${min}" max="${max}" step="${step}" value="${value}" style="--c:${color};">`;
+      <div class="row-head"><b><i></i><label for="${id}">${label}</label></b><small>${sub}</small></div>
+      <input id="${id}" type="range" min="${min}" max="${max}" step="${step}" value="${value}">`;
     container.appendChild(row);
     const el = row.querySelector('input');
-    const fill = () => el.style.setProperty('--v', ((el.value - min) / (max - min) * 100).toFixed(1) + '%');
-    el.addEventListener('input', fill);
-    fill();
+    el.refresh = () => el.style.setProperty('--v', ((el.value - min) / (max - min) * 100).toFixed(1) + '%');
+    el.addEventListener('input', el.refresh);
+    el.refresh();
     return el;
   }
+  function setSlider(id, value) { const el = sliders[id]; el.value = value; el.refresh(); }
 
   function buildControls() {
     for (const [key, m] of Object.entries(E.MODES)) $('selMode').add(new Option(m.name, key));
     E.ROOTS.forEach((r, i) => $('selRoot').add(new Option(r, i)));
-    $('selMode').value = S.cfg.mode;
-    $('selRoot').value = S.cfg.rootPc;
-    $('selDuration').value = String(S.cfg.duration);
-    $('inpSeed').value = S.cfg.seed;
-    $('selBeat').value = S.cfg.beat;
 
     for (const c of CHARACTER) {
-      const el = sliderRow($('charRows'), { id: 'ch-' + c.key, label: c.label, sub: c.sub, color: c.color,
-        min: 0, max: 1, step: 0.01, value: S.cfg[c.key] });
+      const el = sliders['ch-' + c.key] = sliderRow($('charRows'), { id: 'ch-' + c.key, label: c.label, sub: c.sub,
+        color: c.color, min: 0, max: 1, step: 0.01, value: S.cfg[c.key] });
       el.addEventListener('input', () => {
         S.cfg[c.key] = parseFloat(el.value);
         if (S.engine) S.engine.setParam(c.key, S.cfg[c.key]);
-        saveSettings();
+        markCustom();
       });
     }
-
-    for (const [key, meta] of Object.entries(E.LAYERS)) {
-      const el = sliderRow($('mixRows'), { id: 'mx-' + key, label: meta.label, sub: meta.sub, color: LAYER_COLORS[key],
-        min: E.MUTE_DB, max: 0, step: 0.5, value: S.cfg.levels[key] });
+    for (const [key, color, label, sub] of LAYER_UI) {
+      const el = sliders['mx-' + key] = sliderRow($('mixRows'), { id: 'mx-' + key, label, sub, color,
+        min: MUTE, max: 0, step: 0.5, value: S.cfg.levels[key] });
       el.title = 'Far left = off';
       el.addEventListener('input', () => {
         S.cfg.levels[key] = parseFloat(el.value);
         if (S.engine) S.engine.setLevel(key, S.cfg.levels[key]);
-        saveSettings();
+        markCustom();
       });
     }
 
+    for (const [key, p] of Object.entries(PRESETS)) {
+      const b = document.createElement('button');
+      b.className = 'chip'; b.textContent = p.label; b.dataset.preset = key;
+      b.addEventListener('click', () => applyPreset(key));
+      $('presets').appendChild(b);
+    }
+    document.querySelectorAll('#scenePick button').forEach(b =>
+      b.addEventListener('click', () => { S.cfg.scene = b.dataset.scene; syncControls(); saveSettings(); }));
+
     // Structural settings: cross-fade to a new engine while playing
-    const structural = () => { saveSettings(); if (S.playing) restartEngine(); };
+    const structural = (custom = true) => { if (custom) markCustom(); else saveSettings(); if (S.playing) restartEngine(); };
     $('selMode').addEventListener('change', e => { S.cfg.mode = e.target.value; structural(); });
-    $('selRoot').addEventListener('change', e => { S.cfg.rootPc = Number(e.target.value); structural(); });
-    $('selDuration').addEventListener('change', e => { S.cfg.duration = Number(e.target.value); structural(); });
-    $('inpSeed').addEventListener('change', e => { S.cfg.seed = e.target.value.trim() || randomSeed(); e.target.value = S.cfg.seed; structural(); });
-    $('btnDice').addEventListener('click', () => { S.cfg.seed = randomSeed(); $('inpSeed').value = S.cfg.seed; structural(); });
+    $('selRoot').addEventListener('change', e => { S.cfg.rootPc = Number(e.target.value); structural(false); });
+    $('selDuration').addEventListener('change', e => { S.cfg.duration = Number(e.target.value); structural(false); });
+    $('inpSeed').addEventListener('change', e => { S.cfg.seed = e.target.value.trim() || randomSeed(); e.target.value = S.cfg.seed; structural(false); });
+    $('btnDice').addEventListener('click', () => { S.cfg.seed = randomSeed(); $('inpSeed').value = S.cfg.seed; structural(false); });
     $('selBeat').addEventListener('change', e => {
       S.cfg.beat = Number(e.target.value);
       if (S.engine) S.engine.setParam('beat', S.cfg.beat);
-      saveSettings();
+      markCustom();
     });
     $('btnExport').addEventListener('click', exportWav);
     $('playBtn').addEventListener('click', togglePlay);
+    $('bowl').addEventListener('click', togglePlay);
+
+    // Drawer
+    const openDrawer = open => {
+      $('drawer').classList.toggle('open', open);
+      $('backdrop').classList.toggle('open', open);
+      $('drawerBtn').setAttribute('aria-expanded', String(open));
+      if (open) $('drawerClose').focus(); else $('drawerBtn').focus();
+    };
+    $('drawerBtn').addEventListener('click', () => openDrawer(true));
+    $('drawerClose').addEventListener('click', () => openDrawer(false));
+    $('backdrop').addEventListener('click', () => openDrawer(false));
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('drawer').classList.contains('open')) openDrawer(false); });
+
+    syncControls();
+  }
+
+  // Write S.cfg into all controls
+  function syncControls() {
+    const c = S.cfg;
+    $('selMode').value = c.mode;
+    $('selRoot').value = c.rootPc;
+    $('selDuration').value = String(c.duration);
+    $('inpSeed').value = c.seed;
+    $('selBeat').value = c.beat;
+    for (const ch of CHARACTER) setSlider('ch-' + ch.key, c[ch.key]);
+    for (const [key] of LAYER_UI) setSlider('mx-' + key, c.levels[key]);
+    document.querySelectorAll('#presets .chip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.preset === c.preset)));
+    document.querySelectorAll('#scenePick button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.scene === c.scene)));
+  }
+
+  function markCustom() {
+    if (S.cfg.preset) { S.cfg.preset = null; syncControls(); }
+    saveSettings();
+  }
+
+  function applyPreset(key) {
+    const p = PRESETS[key], c = S.cfg, old = { mode: c.mode, duration: c.duration };
+    c.preset = key; c.scene = p.scene; c.mode = p.mode;
+    c.movement = p.movement; c.density = p.density; c.reverb = p.reverb;
+    if (p.duration) c.duration = p.duration;
+    if (p.beat) c.beat = p.beat;
+    c.levels = Object.assign({}, E.DEFAULT_LEVELS, p.levels);
+    syncControls();
+    saveSettings();
+    if (!S.engine) return;
+    if (old.mode !== c.mode || old.duration !== c.duration) { restartEngine(); return; }
+    for (const k of ['movement', 'density', 'reverb', 'beat']) S.engine.setParam(k, c[k]);
+    for (const [k, v] of Object.entries(c.levels)) S.engine.setLevel(k, v);
   }
 
   /* ── Audio lifecycle ───────────────────────────── */
@@ -387,27 +561,24 @@
   function tick() {
     if (!S.engine) return;
     S.engine.advance(S.ctx.currentTime + lookahead());
-    const st = S.engine.status(S.ctx.currentTime);
-    if (st.ended) finishSession();
+    if (S.engine.status(S.ctx.currentTime).ended) finishSession();
   }
 
   async function togglePlay() {
     ensureContext();
     if (!S.playing) {
       await S.ctx.resume();
-      S.playing = true;
+      S.playing = true; S.complete = false;
       startEngine(S.elapsed);
       S.loop = setInterval(tick, 500);
-      applyPlayUI(true);
-      setStatus('active', 'Playing');
+      applyPlayUI(true, 'Playing');
     } else {
       S.playing = false;
       S.elapsed = S.engine ? S.engine.status(S.ctx.currentTime).ts : 0;
       if (S.engine) S.engine.stop(3);
       S.engine = null;
       clearInterval(S.loop);
-      applyPlayUI(false);
-      setStatus('idle', 'Paused');
+      applyPlayUI(false, 'Paused');
     }
   }
 
@@ -415,10 +586,9 @@
     if (S.engine) S.engine.stop(0.5);
     S.engine = null;
     S.playing = false;
-    S.elapsed = 0;
+    S.elapsed = 0; S.complete = true;
     clearInterval(S.loop);
-    applyPlayUI(false);
-    setStatus('idle', 'Session complete');
+    applyPlayUI(false, 'Session complete');
   }
 
   document.addEventListener('visibilitychange', tick);
@@ -448,133 +618,296 @@
   }
 
   /* ── UI helpers ────────────────────────────────── */
-  function applyPlayUI(playing) {
+  function applyPlayUI(playing, status) {
     $('iconPlay').classList.toggle('hidden', playing);
     $('iconPause').classList.toggle('hidden', !playing);
-    const orb = $('orb');
-    orb.classList.remove('orb-idle', 'orb-playing');
-    orb.classList.add(playing ? 'orb-playing' : 'orb-idle');
-    ['ring1', 'ring2'].forEach((id, i) => {
-      const el = $(id);
-      el.style.opacity = playing ? '1' : '0';
-      el.classList.remove('ring-anim-1', 'ring-anim-2');
-      if (playing) el.classList.add(i === 0 ? 'ring-anim-1' : 'ring-anim-2');
-    });
-    const lbl = $('breathLabel');
-    lbl.textContent = playing ? 'Breathe' : 'Begin';
-    lbl.classList.toggle('label-playing', playing);
-    lbl.style.color = playing ? '' : 'rgba(200,180,255,0.3)';
-    $('breathGuide').style.color = playing ? 'rgba(167,139,250,0.42)' : 'rgba(167,139,250,0)';
-  }
-
-  function setStatus(type, text) {
-    const dot = $('statusDot'), lbl = $('statusText');
-    lbl.textContent = text;
-    dot.className = 'inline-block rounded-full transition-all duration-500';
-    if (type === 'active') {
-      dot.style.cssText = 'width:7px;height:7px;background:#8b5cf6;';
-      dot.classList.add('dot-live');
-      lbl.style.color = 'rgba(167,139,250,0.7)';
-    } else {
-      dot.style.cssText = 'width:7px;height:7px;background:#3f3660;';
-      lbl.style.color = 'rgba(100,90,140,0.7)';
-    }
+    $('playBtn').setAttribute('aria-label', playing ? 'Pause' : 'Play');
+    $('stage').classList.toggle('playing', playing);
+    $('cue').textContent = playing ? 'breathe in … and let go' : (S.complete ? 'rest a moment' : 'tap the bowl to begin');
+    $('statusText').textContent = status;
   }
 
   const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-  function updateTime() {
-    let ts = S.elapsed, phase = '';
-    if (S.engine && S.ctx) {
-      const st = S.engine.status(S.ctx.currentTime);
-      ts = Math.max(0, st.ts); phase = st.phase;
-    }
-    const total = S.cfg.duration;
-    $('timeText').textContent = (S.playing || S.elapsed > 0)
-      ? (isFinite(total) ? `${fmt(ts)} / ${fmt(total)}` : fmt(ts)) : '';
-    $('phaseLabel').textContent = S.playing ? phase : '';
+
+  // Session position (0..1) and phase for UI + scene light
+  function sessionInfo() {
+    if (S.engine && S.ctx) { const st = S.engine.status(S.ctx.currentTime); return { ts: Math.max(0, st.ts), p: st.p, phase: st.phase }; }
+    if (S.complete) return { ts: 0, p: 1, phase: '' };
+    if (S.elapsed > 0) { const a = E.arcAt(S.elapsed, S.cfg.duration); return { ts: S.elapsed, p: a.p, phase: a.phase }; }
+    return { ts: 0, p: null, phase: '' };
   }
 
-  /* ── Orb canvas ────────────────────────────────── */
-  (function startOrbCanvas() {
-    const canvas = $('orbCanvas'), ctx = canvas.getContext('2d');
-    const W = canvas.width, H = canvas.height, cx = W / 2, cy = H / 2, BASE_R = 50;
-    let idleT = 0, data = null;
-    function draw() {
-      requestAnimationFrame(draw);
-      updateTime();
-      ctx.clearRect(0, 0, W, H);
-      const analyser = S.out && S.out.analyser;
-      if (!S.playing || !analyser) {
-        idleT += 0.008;
-        ctx.beginPath();
-        ctx.arc(cx, cy, BASE_R + 1.5 * Math.sin(idleT * 0.7), 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(139,92,246,${0.10 + 0.05 * Math.sin(idleT * 0.9)})`;
-        ctx.lineWidth = 1; ctx.stroke();
-        return;
-      }
-      if (!data || data.length !== analyser.fftSize) data = new Float32Array(analyser.fftSize);
-      analyser.getFloatTimeDomainData(data);
-      const N = data.length;
-      let rms = 0;
-      for (let i = 0; i < N; i++) rms += data[i] * data[i];
-      rms = Math.sqrt(rms / N);
-      const amp = Math.min(1, rms * 6);
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(cx, cy, BASE_R + 22, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(139,92,246,${0.12 + amp * 0.25})`;
-      ctx.lineWidth = 12 + amp * 8; ctx.stroke();
-      ctx.beginPath();
-      for (let i = 0; i <= N; i++) {
-        const t = (i / N) * Math.PI * 2 - Math.PI / 2;
-        const r = BASE_R + data[i % N] * 30;
-        const x = cx + r * Math.cos(t), y = cy + r * Math.sin(t);
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-      }
-      ctx.closePath();
-      const grad = ctx.createRadialGradient(cx, cy, BASE_R - 8, cx, cy, BASE_R + 36);
-      grad.addColorStop(0, `rgba(200,170,255,${0.35 + amp * 0.55})`);
-      grad.addColorStop(1, 'rgba(99,60,230,0)');
-      ctx.strokeStyle = grad; ctx.lineWidth = 1.5;
-      ctx.shadowBlur = 10 + amp * 22; ctx.shadowColor = 'rgba(139,92,246,0.75)';
-      ctx.stroke();
-      const dotR = 3 + amp * 14;
-      const dotG = ctx.createRadialGradient(cx, cy, 0, cx, cy, dotR);
-      dotG.addColorStop(0, `rgba(220,200,255,${0.35 + amp * 0.55})`);
-      dotG.addColorStop(1, 'rgba(139,92,246,0)');
-      ctx.beginPath(); ctx.arc(cx, cy, dotR, 0, Math.PI * 2);
-      ctx.fillStyle = dotG; ctx.shadowBlur = 0; ctx.fill();
-      ctx.restore();
+  let lastPhase = null;
+  function updateTransport(info) {
+    const total = S.cfg.duration, active = S.playing || S.elapsed > 0;
+    $('timeText').textContent = active ? (isFinite(total) ? `${fmt(info.ts)} / ${fmt(total)}` : fmt(info.ts)) : '';
+    $('progress').style.visibility = active && isFinite(total) ? 'visible' : 'hidden';
+    $('progressFill').style.width = active && isFinite(total) ? (Math.min(1, info.ts / total) * 100).toFixed(2) + '%' : '0';
+    const phase = active ? info.phase : '';
+    if (phase !== lastPhase) {
+      lastPhase = phase;
+      document.querySelectorAll('#phases span').forEach(s => s.classList.toggle('on', s.dataset.phase === phase));
     }
-    draw();
+  }
+
+  /* Scene light follows the session arc:
+     dawn while arriving → full light while deepening → brightest in stillness → dusk while returning. */
+  function targetLight(p) {
+    if (p === null) return 0.75;                       // not started yet
+    if (p < 0.12) return 0.35 + 0.45 * (p / 0.12);      // Arriving
+    if (p < 0.55) return 0.8 + 0.2 * ((p - 0.12) / 0.43); // Deepening
+    if (p < 0.80) return 1;                             // Stillness
+    return 1 - 0.7 * ((p - 0.8) / 0.2);                 // Returning
+  }
+
+  /* ── Audio level (shared by ripples) ───────────── */
+  const level = { data: null, amp: 0, slow: 0 };
+  function readLevel() {
+    const an = S.out && S.out.analyser;
+    if (!S.playing || !an) { level.amp *= 0.95; level.slow *= 0.98; return; }
+    if (!level.data || level.data.length !== an.fftSize) level.data = new Float32Array(an.fftSize);
+    an.getFloatTimeDomainData(level.data);
+    let rms = 0;
+    for (let i = 0; i < level.data.length; i++) rms += level.data[i] * level.data[i];
+    level.amp = Math.min(1, Math.sqrt(rms / level.data.length) * 6);
+    level.slow += (level.amp - level.slow) * 0.02;
+  }
+
+  /* ── Ripples on the water inside the bowl ──────── */
+  const ripples = (function () {
+    const cv = $('rippleCanvas'), g = cv.getContext('2d');
+    const CX = 150, CY = 92, RX = 104, RY = 28;
+    const rings = [];
+    let nextIdle = 0, cooldown = 0;
+    function spawn(strength) { rings.push({ r: 0.08, s: strength }); }
+    return function draw(now) {
+      g.clearRect(0, 0, cv.width, cv.height);
+      g.save();
+      g.beginPath(); g.ellipse(CX, CY, RX, RY, 0, 0, Math.PI * 2); g.clip();
+      // light on the water: brighter with louder sound
+      const sheen = g.createRadialGradient(CX - 15, CY - 6, 0, CX, CY, RX);
+      sheen.addColorStop(0, `rgba(255,226,168,${0.25 + level.slow * 0.5})`);
+      sheen.addColorStop(1, 'rgba(42,28,12,0)');
+      g.fillStyle = sheen; g.fillRect(0, 0, cv.width, cv.height);
+      if (!REDUCED_MOTION) {
+        if (S.playing) {
+          cooldown -= 1;
+          // a sudden rise in level (bowl strike, new phrase) sends a strong ring
+          if (level.amp > level.slow * 1.5 + 0.06 && cooldown <= 0) { spawn(Math.min(1, 0.4 + level.amp)); cooldown = 40; }
+          else if (Math.random() < 0.004 + level.slow * 0.03) spawn(0.25 + level.slow * 0.6);
+        } else if (now > nextIdle) { spawn(0.25); nextIdle = now + 4000; }
+        for (let i = rings.length - 1; i >= 0; i--) {
+          const k = rings[i];
+          k.r += 0.0035 + k.s * 0.003;
+          const a = k.s * (1 - k.r / 1.3);
+          if (a <= 0) { rings.splice(i, 1); continue; }
+          g.beginPath(); g.ellipse(CX, CY, RX * k.r, RY * k.r, 0, 0, Math.PI * 2);
+          g.strokeStyle = `rgba(255,232,180,${(a * 0.8).toFixed(3)})`;
+          g.lineWidth = 0.6 + k.s * 1.4;
+          g.stroke();
+        }
+      }
+      g.restore();
+    };
   })();
 
-  /* ── Starfield ─────────────────────────────────── */
-  (function startStars() {
-    const canvas = $('starCanvas'), ctx = canvas.getContext('2d');
-    const STARS = Array.from({ length: 210 }, () => ({
-      xr: Math.random(), yr: Math.random(), r: Math.random() * 1.15 + 0.2,
-      base: 0.06 + Math.random() * 0.55, speed: 0.0018 + Math.random() * 0.003, phase: Math.random() * Math.PI * 2,
-    }));
-    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-    window.addEventListener('resize', resize);
-    resize();
-    (function drawStars() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const t = performance.now() / 1000;
-      STARS.forEach(s => {
-        const a = s.base * (0.25 + 0.75 * (0.5 + 0.5 * Math.sin(t * s.speed * 6 + s.phase)));
-        ctx.beginPath();
-        ctx.arc(s.xr * canvas.width, s.yr * canvas.height, s.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(215,205,255,${a.toFixed(3)})`;
-        ctx.fill();
+  /* ── Procedural scenes (no photos) ─────────────── */
+  const SCENES = { lake: null, grove: null, night: null }; // filled below
+  const sceneRenderer = (function () {
+    const c = $('scene'), g = c.getContext('2d');
+    let W, H, trees = [], motes = [], ridges = [], stars = [];
+    const rnd = (a, b) => a + Math.random() * (b - a);
+
+    function build() {
+      W = c.width = innerWidth; H = c.height = innerHeight;
+      trees = [];
+      [[0.45, 'rgba(120,120,70,0.35)', 14, 6, 14], [0.7, 'rgba(55,65,40,0.65)', 9, 12, 26], [1, 'rgba(20,28,20,0.92)', 6, 22, 46]]
+        .forEach(([depth, col, n, wMin, wMax]) => {
+          for (let i = 0; i < n; i++) trees.push({ x: rnd(-0.05, 1.05) * W, w: rnd(wMin, wMax) * depth, col, lean: rnd(-0.03, 0.03) });
+        });
+      ridges = [
+        { amp: 0.26, col: '#8c8fa0', snow: 0.55, pts: ridge(9) },
+        { amp: 0.17, col: '#4d4a46', snow: 0.25, pts: ridge(7) },
+        { amp: 0.08, col: '#2b2a24', snow: 0,    pts: ridge(11) },
+      ];
+      motes = Array.from({ length: 70 }, () => ({ x: rnd(0, W), y: rnd(0, H * 0.8), r: rnd(0.6, 2.4), s: rnd(0.05, 0.25), p: rnd(0, 6.28) }));
+      stars = Array.from({ length: 160 }, () => ({ x: rnd(0, W), y: rnd(0, H * 0.6), r: rnd(0.3, 1.2), p: rnd(0, 6.28) }));
+    }
+    function ridge(n) { // jagged peaks with a valley in the middle where the sun rises
+      return Array.from({ length: n + 1 }, (_, i) => {
+        const x = i / n, valley = 1 - 0.75 * Math.exp(-Math.pow((x - 0.5) / 0.13, 2));
+        return [x, valley * rnd(0.45, 1)];
       });
-      requestAnimationFrame(drawStars);
-    })();
+    }
+
+    function candle(x, y, s, t, i, L) {
+      const f = REDUCED_MOTION ? 1 : 1 + 0.15 * Math.sin(t * 7 + i * 3) + 0.08 * Math.sin(t * 13 + i);
+      const gl = g.createRadialGradient(x, y - 30 * s, 0, x, y - 30 * s, 80 * s * f);
+      gl.addColorStop(0, `rgba(255,190,110,${0.45 + 0.25 * (1 - L)})`); gl.addColorStop(1, 'rgba(255,190,110,0)');
+      g.fillStyle = gl; g.fillRect(x - 100 * s, y - 120 * s, 200 * s, 200 * s);
+      const wax = g.createLinearGradient(x - 12 * s, 0, x + 12 * s, 0);
+      wax.addColorStop(0, '#c9b089'); wax.addColorStop(0.4, '#fbeed2'); wax.addColorStop(1, '#a88e66');
+      g.fillStyle = wax; g.fillRect(x - 12 * s, y - 22 * s, 24 * s, 34 * s);
+      g.fillStyle = '#fff6dc'; g.beginPath(); g.ellipse(x, y - 30 * s, 3 * s, 7 * s * f, 0, 0, 6.28); g.fill();
+    }
+    function motesLayer(t, col) {
+      motes.forEach(m => {
+        if (!REDUCED_MOTION) {
+          m.y -= m.s; m.x += Math.sin(t * 0.4 + m.p) * 0.15;
+          if (m.y < -5) { m.y = H * 0.8; m.x = rnd(0, W); }
+        }
+        g.fillStyle = `rgba(${col},${0.25 + 0.35 * (0.5 + 0.5 * Math.sin(t * 1.3 + m.p))})`;
+        g.beginPath(); g.arc(m.x, m.y, m.r, 0, 6.28); g.fill();
+      });
+    }
+    function shimmer(horizon, sunX, t, col, a) {
+      for (let y = horizon + 3; y < H; y += 5) {
+        const k = (y - horizon) / (H - horizon);
+        const w = (40 + k * 160) * (0.6 + 0.4 * Math.sin(y * 0.3 + t * 1.2));
+        g.fillStyle = `rgba(${col},${a * (1 - k)})`;
+        g.fillRect(sunX - w / 2 + Math.sin(y * 0.1 + t) * 8, y, w, 1.5);
+      }
+    }
+    // Darkness + vignette: less light = darker scene; vignette keeps the UI readable
+    function finish(L, vig) {
+      g.fillStyle = `rgba(8,10,16,${((1 - L) * 0.65).toFixed(3)})`; g.fillRect(0, 0, W, H);
+      const v = g.createRadialGradient(W / 2, H * 0.45, Math.min(W, H) * 0.2, W / 2, H * 0.45, Math.max(W, H) * 0.75);
+      v.addColorStop(0, 'rgba(10,14,10,0.12)'); v.addColorStop(1, `rgba(10,14,10,${vig})`);
+      g.fillStyle = v; g.fillRect(0, 0, W, H);
+    }
+
+    /* Mountain lake at sunrise: the sun climbs out of the valley as the light rises */
+    function lakeUpper(horizon, sunX, sunY, L) {
+      const sky = g.createLinearGradient(0, 0, 0, horizon);
+      sky.addColorStop(0, '#3d5a73'); sky.addColorStop(0.55, '#a9b7b8'); sky.addColorStop(0.85, '#f3cf8f'); sky.addColorStop(1, '#ffe2a8');
+      g.fillStyle = sky; g.fillRect(0, 0, W, horizon);
+      const sun = g.createRadialGradient(sunX, sunY, 0, sunX, sunY, H * 0.55);
+      sun.addColorStop(0, `rgba(255,248,225,${0.4 + 0.6 * L})`); sun.addColorStop(0.06, `rgba(255,225,160,${0.85 * L})`);
+      sun.addColorStop(0.35, `rgba(255,200,120,${0.18 * L})`); sun.addColorStop(1, 'rgba(255,200,120,0)');
+      g.fillStyle = sun; g.fillRect(0, 0, W, horizon);
+      ridges.forEach(r => {
+        const pts = r.pts.map(([x, h]) => [x * W, horizon - h * r.amp * H]);
+        g.fillStyle = r.col; g.beginPath(); g.moveTo(0, horizon);
+        pts.forEach(([x, y]) => g.lineTo(x, y)); g.lineTo(W, horizon); g.fill();
+        if (r.snow) {
+          g.save(); g.clip();
+          const sn = g.createLinearGradient(0, horizon - r.amp * H, 0, horizon - r.amp * H * (1 - r.snow));
+          sn.addColorStop(0, `rgba(255,244,225,${0.5 + 0.4 * L})`); sn.addColorStop(1, 'rgba(255,244,225,0)');
+          g.fillStyle = sn; g.fillRect(0, 0, W, horizon); g.restore();
+        }
+        g.strokeStyle = `rgba(255,215,154,${0.35 * L})`; g.lineWidth = 1.2; g.beginPath();
+        pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke();
+      });
+      const hz = g.createLinearGradient(0, horizon - H * 0.12, 0, horizon);
+      hz.addColorStop(0, 'rgba(255,225,170,0)'); hz.addColorStop(1, `rgba(255,225,170,${0.45 * L})`);
+      g.fillStyle = hz; g.fillRect(0, horizon - H * 0.12, W, H * 0.12);
+    }
+    SCENES.lake = function (t, L) {
+      const horizon = H * 0.5, sunX = W * 0.5, sunY = horizon + 10 - L * H * 0.12;
+      lakeUpper(horizon, sunX, sunY, L);
+      // mirror reflection: the upper half again, flipped, tinted like water
+      g.save(); g.beginPath(); g.rect(0, horizon, W, H - horizon); g.clip();
+      g.translate(0, 2 * horizon); g.scale(1, -1); lakeUpper(horizon, sunX, sunY, L); g.restore();
+      const tint = g.createLinearGradient(0, horizon, 0, H);
+      tint.addColorStop(0, 'rgba(30,50,60,0.25)'); tint.addColorStop(1, 'rgba(12,22,28,0.75)');
+      g.fillStyle = tint; g.fillRect(0, horizon, W, H - horizon);
+      shimmer(horizon, sunX, t, '255,236,190', 0.35 * L);
+      const ledge = () => { g.beginPath(); g.moveTo(0, H * 0.9);
+        g.quadraticCurveTo(W * 0.25, H * 0.83, W * 0.5, H * 0.86); g.quadraticCurveTo(W * 0.75, H * 0.89, W, H * 0.84); };
+      const st = g.createLinearGradient(0, H * 0.84, 0, H);
+      st.addColorStop(0, '#6d6457'); st.addColorStop(1, '#1d1a16');
+      g.fillStyle = st; ledge(); g.lineTo(W, H); g.lineTo(0, H); g.fill();
+      g.strokeStyle = `rgba(255,220,160,${0.35 * L})`; g.lineWidth = 1.5; ledge(); g.stroke();
+      motesLayer(t, '255,240,210');
+      finish(L, 0.55);
+    };
+
+    /* Forest grove at golden hour */
+    SCENES.grove = function (t, L) {
+      const horizon = H * 0.66, sunX = W * 0.72, sunY = H * (0.38 - 0.1 * L);
+      const sky = g.createLinearGradient(0, 0, 0, horizon);
+      sky.addColorStop(0, '#5e6a46'); sky.addColorStop(0.45, '#c79a5a'); sky.addColorStop(1, '#f2c983');
+      g.fillStyle = sky; g.fillRect(0, 0, W, horizon);
+      const sun = g.createRadialGradient(sunX, sunY, 0, sunX, sunY, H * 0.7);
+      sun.addColorStop(0, `rgba(255,240,200,${0.4 + 0.55 * L})`); sun.addColorStop(0.12, `rgba(255,215,154,${0.6 * L})`); sun.addColorStop(1, 'rgba(255,215,154,0)');
+      g.fillStyle = sun; g.fillRect(0, 0, W, H);
+      trees.forEach(tr => {
+        g.fillStyle = tr.col; g.beginPath();
+        g.moveTo(tr.x - tr.w / 2, horizon + 4); g.lineTo(tr.x - tr.w / 2 + tr.lean * H, -10);
+        g.lineTo(tr.x + tr.w / 2 + tr.lean * H, -10); g.lineTo(tr.x + tr.w / 2, horizon + 4); g.fill();
+      });
+      const top = g.createLinearGradient(0, 0, 0, H * 0.35);
+      top.addColorStop(0, 'rgba(15,23,18,0.85)'); top.addColorStop(1, 'rgba(15,23,18,0)');
+      g.fillStyle = top; g.fillRect(0, 0, W, H * 0.35);
+      g.save(); g.globalCompositeOperation = 'screen';
+      for (let i = 0; i < 6; i++) {
+        const a = -2.2 + i * 0.16 + Math.sin(t * 0.05 + i) * 0.02;
+        g.fillStyle = `rgba(255,225,170,${(0.05 + 0.03 * Math.sin(t * 0.3 + i * 2)) * L})`;
+        g.beginPath(); g.moveTo(sunX, sunY);
+        g.lineTo(sunX + Math.cos(a) * W * 1.5, sunY - Math.sin(a) * H * 1.5);
+        g.lineTo(sunX + Math.cos(a + 0.05) * W * 1.5, sunY - Math.sin(a + 0.05) * H * 1.5); g.fill();
+      }
+      g.restore();
+      const wat = g.createLinearGradient(0, horizon - 20, 0, H);
+      wat.addColorStop(0, 'rgba(107,90,53,0)'); wat.addColorStop(0.08, '#6b5a35'); wat.addColorStop(0.3, '#2b2a1c'); wat.addColorStop(1, '#0f1410');
+      g.fillStyle = wat; g.fillRect(0, horizon - 20, W, H - horizon + 20);
+      shimmer(horizon, sunX, t, '255,220,160', 0.22 * L);
+      g.fillStyle = 'rgba(10,14,10,0.9)';
+      g.beginPath(); g.moveTo(0, H * 0.82);
+      g.quadraticCurveTo(W * 0.3, H * 0.76, W * 0.55, H * 0.8); g.quadraticCurveTo(W * 0.8, H * 0.84, W, H * 0.79);
+      g.lineTo(W, H); g.lineTo(0, H); g.fill();
+      candle(W * 0.12, H * 0.84, 1, t, 0, L); candle(W * 0.17, H * 0.86, 0.8, t, 1, L); candle(W * 0.88, H * 0.85, 0.9, t, 2, L);
+      motesLayer(t, '255,230,170');
+      finish(L, 0.7);
+    };
+
+    /* Candle night: light = soft moon glow, candles get stronger when it is darker */
+    SCENES.night = function (t, L) {
+      const sky = g.createLinearGradient(0, 0, 0, H);
+      sky.addColorStop(0, '#120f22'); sky.addColorStop(0.6, '#241a33'); sky.addColorStop(1, '#0b0a12');
+      g.fillStyle = sky; g.fillRect(0, 0, W, H);
+      const moon = g.createRadialGradient(W * 0.78, H * 0.18, 0, W * 0.78, H * 0.18, H * 0.4);
+      moon.addColorStop(0, `rgba(220,210,255,${0.25 * L})`); moon.addColorStop(1, 'rgba(220,210,255,0)');
+      g.fillStyle = moon; g.fillRect(0, 0, W, H);
+      stars.forEach(s => {
+        g.fillStyle = `rgba(240,230,255,${0.15 + 0.4 * (0.5 + 0.5 * Math.sin(t * 0.8 + s.p))})`;
+        g.beginPath(); g.arc(s.x, s.y, s.r, 0, 6.28); g.fill();
+      });
+      const ground = g.createLinearGradient(0, H * 0.74, 0, H * 0.84);
+      ground.addColorStop(0, 'rgba(13,11,16,0)'); ground.addColorStop(1, '#0d0b10');
+      g.fillStyle = ground; g.fillRect(0, H * 0.74, W, H * 0.26);
+      [[0.08, 0.86, 1.1], [0.14, 0.88, 0.8], [0.2, 0.85, 0.65], [0.8, 0.86, 0.75], [0.87, 0.88, 1.15], [0.93, 0.85, 0.7]]
+        .forEach(([x, y, s], i) => candle(W * x, H * y, s, t, i, L));
+      motesLayer(t, '255,200,140');
+      finish(0.6 + 0.4 * L, 0.6);
+    };
+
+    addEventListener('resize', build);
+    build();
+    return (t, L) => SCENES[S.cfg.scene](t, L);
+  })();
+
+  /* ── Main animation loop ───────────────────────── */
+  (function loop() {
+    let light = targetLight(null), lastScene = 0;
+    function frame(now) {
+      requestAnimationFrame(frame);
+      const info = sessionInfo();
+      updateTransport(info);
+      readLevel();
+      ripples(now);
+      light += (targetLight(info.p) - light) * 0.01;   // smooth, slow change of light
+      // reduced motion: redraw the scene only every 2 s
+      if (REDUCED_MOTION && now - lastScene < 2000) return;
+      lastScene = now;
+      sceneRenderer(now / 1000, light);
+    }
+    requestAnimationFrame(frame);
   })();
 
   loadSettings();
   buildControls();
+  applyPlayUI(false, 'Ready');
   </script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 # MediTone — Design Concept "Singing Bowl & Calm Places"
 
-Status: draft for discussion. Mockup: [`design-mockup.html`](design-mockup.html) (open in a browser, `?scene=grove|lake|night`).
+Status: implemented in `index.html`. Decisions: default scene = mountain lake, presets = yes, light follows the session arc, binaural layer stays visible. Mockup: [`design-mockup.html`](design-mockup.html) (open in a browser, `?scene=grove|lake|night`).
 
 ## 1. Goal
 
