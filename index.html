@@ -82,6 +82,10 @@
     .guide-ring .prog  { stroke: var(--brass-light); stroke-width: 1.6; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(232,194,122,0.6)); }
     .check { display: flex; align-items: center; gap: 0.6rem; font-size: 0.82rem; color: var(--text); margin-top: 0.8rem; cursor: pointer; }
     .check input { accent-color: var(--brass); width: 16px; height: 16px; }
+    .diag { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 0.8rem; font-size: 0.72rem; margin: 0.8rem 0; }
+    .diag dt { color: var(--text-faint); }
+    .diag dd { color: var(--text); font-variant-numeric: tabular-nums; text-align: right; }
+    .diag dd.warn { color: #f0a070; }
 
     /* ── Transport ── */
     .transport { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; }
@@ -353,6 +357,21 @@
     </section>
 
     <section class="group">
+      <div class="group-title">Audio &amp; diagnostics</div>
+      <label><span class="lbl">Audio buffer</span>
+        <select id="selBuffer" class="field">
+          <option value="normal">Normal · browser default</option>
+          <option value="large">Large · 0.2 s (recommended)</option>
+          <option value="xl">Extra large · 0.5 s</option>
+        </select>
+      </label>
+      <p class="hint">A larger buffer gives the computer more time per audio block and helps against stuttering. The delay does not matter for this music. The browser may limit the value; the real value is shown below.</p>
+      <dl class="diag" id="diag"></dl>
+      <button id="btnDiagCopy" class="btn">Copy diagnostic report</button>
+      <p id="diagText" class="hint" style="text-align:center;">Start playback, wait 1–2 minutes, then copy the report.</p>
+    </section>
+
+    <section class="group">
       <div class="group-title">Export</div>
       <button id="btnExport" class="btn">Render WAV</button>
       <p id="exportText" class="hint" style="text-align:center;">Renders the session offline with the current settings (max 20 min).</p>
@@ -432,7 +451,7 @@
       movement: 0.5, density: 0.5, reverb: 0.6, beat: 4,
       levels: Object.assign({}, E.DEFAULT_LEVELS),
       scene: 'lake', preset: 'lakeCalm',
-      breath: 'calm', chime: false, eco: false,
+      breath: 'calm', chime: false, eco: false, buffer: 'large',
     },
   };
 
@@ -454,6 +473,7 @@
       Object.assign(S.cfg, c);
       if (!SCENES[S.cfg.scene]) S.cfg.scene = 'lake';
       if (!BREATH[S.cfg.breath]) S.cfg.breath = 'calm';
+      if (!BUFFER[S.cfg.buffer]) S.cfg.buffer = 'large';
     } catch (_) { /* ignore */ }
   }
 
@@ -523,6 +543,8 @@
     $('selBreath').addEventListener('change', e => { S.cfg.breath = e.target.value; guide.restart(); saveSettings(); });
     $('chkChime').addEventListener('change', e => { S.cfg.chime = e.target.checked; guide.restart(); saveSettings(); });
     $('chkEco').addEventListener('change', e => { S.cfg.eco = e.target.checked; saveSettings(); });
+    $('selBuffer').addEventListener('change', e => { S.cfg.buffer = e.target.value; saveSettings(); rebuildContext(); });
+    $('btnDiagCopy').addEventListener('click', diag.copy);
     $('btnExport').addEventListener('click', exportWav);
     $('playBtn').addEventListener('click', togglePlay);
     $('bowl').addEventListener('click', togglePlay);
@@ -553,6 +575,7 @@
     $('selBreath').value = c.breath;
     $('chkChime').checked = !!c.chime;
     $('chkEco').checked = !!c.eco;
+    $('selBuffer').value = c.buffer;
     for (const ch of CHARACTER) setSlider('ch-' + ch.key, c[ch.key]);
     for (const [key] of LAYER_UI) setSlider('mx-' + key, c.levels[key]);
     document.querySelectorAll('#presets .chip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.preset === c.preset)));
@@ -580,11 +603,34 @@
   }
 
   /* ── Audio lifecycle ───────────────────────────── */
+  // Audio buffer setting → AudioContext latencyHint (seconds or browser category)
+  const BUFFER = { normal: 'playback', large: 0.2, xl: 0.5 };
+
   function ensureContext() {
     if (S.ctx) return;
     const AC = window.AudioContext || window.webkitAudioContext;
-    S.ctx = new AC({ latencyHint: 'playback' });
+    try {
+      S.ctx = new AC({ latencyHint: BUFFER[S.cfg.buffer] });
+    } catch (_) {
+      S.ctx = new AC({ latencyHint: 'playback' });   // browser rejected the numeric value
+    }
     S.out = E.createOutput(S.ctx, true);
+    diag.reset();
+  }
+
+  // A new buffer size needs a new AudioContext: pause, close, continue at the same position
+  let rebuilding = false;
+  async function rebuildContext() {
+    if (!S.ctx || rebuilding) return;
+    rebuilding = true;
+    try {
+      const wasPlaying = S.playing;
+      if (wasPlaying) await togglePlay();
+      const old = S.ctx;
+      S.ctx = null; S.out = null;
+      try { await old.close(); } catch (_) { /* ignore */ }
+      if (wasPlaying) await togglePlay(); else { ensureContext(); }
+    } finally { rebuilding = false; }
   }
 
   // Background tabs throttle timers → schedule further ahead when hidden
@@ -1060,6 +1106,114 @@
     };
   })();
 
+  /* ── Diagnostics ───────────────────────────────────
+     Measures what can cause stuttering: audio buffer, audio clock lag, active sound sources,
+     main-thread stalls and scene frame rate. Browser playback statistics are shown if available. */
+  const diag = (function () {
+    // Count active sound sources (oscillators, noise buffers) per audio context:
+    // started and not yet ended. Offline export and closed contexts are not counted.
+    const liveByCtx = new WeakMap();
+    let peakLive = 0;
+    const liveNow = () => (S.ctx && liveByCtx.get(S.ctx)) || 0;
+    const origStart = AudioScheduledSourceNode.prototype.start;
+    AudioScheduledSourceNode.prototype.start = function () {
+      const c = this.context;
+      if (c === S.ctx) {
+        const n = (liveByCtx.get(c) || 0) + 1;
+        liveByCtx.set(c, n);
+        if (n > peakLive) peakLive = n;
+        this.addEventListener('ended', () => liveByCtx.set(c, liveByCtx.get(c) - 1), { once: true });
+      }
+      return origStart.apply(this, arguments);
+    };
+
+    // Audio clock vs wall clock: if the audio clock falls behind, audio was not rendered in time.
+    // This is an estimate; browsers handle late audio blocks differently.
+    let a0 = null, w0 = 0, lagMs = 0, lagEvents = 0, lastLag = 0;
+    // Main-thread stalls: how late a 100 ms timer fires
+    let lastTick = performance.now(), maxStall = 0, stalls = 0;
+    // Scene frame rate
+    let sceneFrames = 0, sceneFps = 0, fpsT = performance.now();
+
+    setInterval(() => {
+      const now = performance.now(), late = now - lastTick - 100;
+      lastTick = now;
+      if (late > maxStall) maxStall = late;
+      if (late > 50 && !document.hidden) stalls++;
+      if (now - fpsT >= 1000) { sceneFps = sceneFrames * 1000 / (now - fpsT); sceneFrames = 0; fpsT = now; }
+      if (S.playing && S.ctx && S.ctx.state === 'running' && !document.hidden) {
+        const a = S.ctx.currentTime, w = now / 1000;
+        if (a0 === null) { a0 = a; w0 = w; lastLag = 0; return; }
+        const lag = ((w - w0) - (a - a0)) * 1000;     // ms the audio clock is behind
+        const quantum = Math.max(30, (S.ctx.baseLatency || 0) * 1000 * 1.5);
+        if (lag - lastLag > quantum) { lagEvents++; lastLag = lag; }
+        else if (lag < lastLag) lastLag = Math.max(0, lag);
+        lagMs = Math.max(0, lag);
+      } else { a0 = null; }
+    }, 100);
+
+    function browserStats() {
+      const st = S.ctx && (S.ctx.playbackStats || S.ctx.playoutStats);
+      if (!st) return null;
+      const out = [];
+      for (const k in st) {
+        const v = st[k];
+        if (typeof v !== 'number') continue;
+        if (k === 'underrunEvents') out.unshift(['Dropouts (browser count)', String(v), v > 0]);
+        else if (k === 'underrunDuration') out.unshift(['Dropout time (browser)', (v * 1000).toFixed(0) + ' ms', v > 0]);
+        else out.push(['Browser: ' + k, String(Math.round(v * 1000) / 1000)]);
+      }
+      return out.length ? out : null;
+    }
+
+    function rows() {
+      const c = S.ctx, r = [];
+      const ms = v => (v === undefined || v === null) ? 'n/a' : (v * 1000).toFixed(1) + ' ms';
+      const bs = browserStats();
+      if (bs) bs.filter(x => x[2] !== undefined).forEach(x => r.push(x));
+      r.push(['Audio state', c ? c.state : 'not started']);
+      r.push(['Buffer setting', S.cfg.buffer + ' (' + BUFFER[S.cfg.buffer] + ')']);
+      r.push(['Sample rate', c ? c.sampleRate + ' Hz' : 'n/a']);
+      r.push(['Base latency', c ? ms(c.baseLatency) : 'n/a']);
+      r.push(['Output latency', c ? ms(c.outputLatency) : 'n/a']);
+      r.push(['Audio clock lag', lagMs.toFixed(0) + ' ms', lagMs > 200]);
+      r.push(['Lag jumps (est. dropouts)', String(lagEvents), lagEvents > 0]);
+      r.push(['Active sound sources', liveNow() + ' (peak ' + peakLive + ')', liveNow() > 150]);
+      r.push(['Main-thread stalls > 50 ms', stalls + ' (max ' + maxStall.toFixed(0) + ' ms)', stalls > 5]);
+      r.push(['Scene frame rate', sceneFps.toFixed(0) + ' fps' + (S.cfg.eco ? ' (eco)' : '')]);
+      if (bs) bs.filter(x => x[2] === undefined).forEach(x => r.push(x));
+      else r.push(['Browser playback stats', 'not supported']);
+      r.push(['CPU threads', String(navigator.hardwareConcurrency || 'n/a')]);
+      r.push(['Scene / guide', S.cfg.scene + ' / ' + S.cfg.breath + (S.cfg.chime ? ' + chime' : '')]);
+      return r;
+    }
+
+    function render() {
+      if (!$('drawer').classList.contains('open')) return;
+      $('diag').innerHTML = rows().map(([k, v, w]) => `<dt>${k}</dt><dd${w ? ' class="warn"' : ''}>${v}</dd>`).join('');
+    }
+    setInterval(render, 1000);
+
+    return {
+      sceneFrame() { sceneFrames++; },
+      reset() { a0 = null; lagMs = 0; lagEvents = 0; lastLag = 0; stalls = 0; maxStall = 0; peakLive = 0; },
+      async copy() {
+        const text = ['MediTone diagnostic report', new Date().toISOString(), navigator.userAgent, '']
+          .concat(rows().map(([k, v]) => k + ': ' + v)).join('\n');
+        try {
+          await navigator.clipboard.writeText(text);
+          $('diagText').textContent = 'Report copied. Paste it into the chat.';
+        } catch (_) {
+          const ta = document.createElement('textarea');
+          ta.value = text; document.body.appendChild(ta); ta.select();
+          try { document.execCommand('copy'); $('diagText').textContent = 'Report copied. Paste it into the chat.'; }
+          catch (__) { $('diagText').textContent = 'Copy failed. Please select and copy the values above.'; }
+          ta.remove();
+        }
+      },
+    };
+  })();
+
   /* ── Main animation loop ───────────────────────── */
   (function loop() {
     let light = targetLight(null), lastScene = 0;
@@ -1076,6 +1230,7 @@
       if (now - lastScene < interval - 2) return;
       lastScene = now;
       sceneRenderer(now / 1000, light);
+      diag.sceneFrame();
     }
     requestAnimationFrame(frame);
   })();

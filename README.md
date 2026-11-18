@@ -35,6 +35,7 @@ The main screen shows a singing bowl in a calm natural scene. All scenes are dra
 - **Bowl:** ripples on the water follow the audio level. Click the bowl to play or pause.
 - **Presets:** *Lake Calm*, *Forest Calm*, *Deep Bowls*, *Water Breath*, *Sleep*. A preset sets mode, character, layer levels and scene. Key and seed stay.
 - **Breathing guide:** the cue switches between *breathe in*, *hold* and *breathe out*. Bowl and halo grow and sink with the breath, a thin ring fills during each step. Patterns: *Calm 4–6* (default), *4–7–8*, *Box 4–4–4–4*, *Off*. An optional soft bowl chime marks each in/out change (also when the tab is in the background). The chime is not part of the WAV export.
+- **Audio & diagnostics** (settings drawer): *Audio buffer* Normal / Large 0.2 s (default) / Extra large 0.5 s. A larger buffer helps against stuttering; the browser may limit the value. The diagnostics show dropouts (browser count where supported, e.g. Chrome), latency, sample rate, active sound sources, main-thread stalls and scene frame rate. *Copy diagnostic report* puts all values on the clipboard.
 - All other settings are in the **Settings** drawer.
 - **Performance:** the scene renders at half resolution and max. 30 fps. *Eco mode* (settings → Scene) keeps the scene still and redraws it only every 2 s; use it on slow notebooks or on battery. `prefers-reduced-motion` uses the same still mode.
 
