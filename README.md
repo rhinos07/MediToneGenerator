@@ -15,7 +15,7 @@ Open `index.html` in a browser (or serve the folder, e.g. with GitHub Pages) and
 | Handpan | Modal synthesis (fundamental, octave, twelfth, slight beating). |
 | Singing Bowls | Inharmonic partials with beating. Struck or rubbed. A bowl opens and closes each session. |
 | Tanpura | Optional jawari-like drone plucks. Off by default. |
-| Ocean | Pink noise with irregular wave swells (no periodic LFO). |
+| Water (Ocean) | Pink noise with irregular wave swells (no periodic LFO). |
 | Binaural | Optional. The carrier is tuned to the root. Use headphones. |
 
 ## Composition
@@ -25,6 +25,19 @@ Open `index.html` in a browser (or serve the folder, e.g. with GitHub Pages) and
 - **Space:** Every phrase gets a depth plane (near / mid / far) and a stereo position. All planes share one long hall (≈ 9 s), a short room and an irregular stereo echo.
 - **Session arc:** Density and brightness follow an arc over the session: *Arriving → Deepening → Stillness → Returning*. Finite sessions fade out at the end. "Endless" repeats the arc with variations.
 - **Seed:** The same seed with the same settings gives the same piece.
+
+## Design
+
+The main screen shows a singing bowl in a calm natural scene. All scenes are drawn procedurally (no photos).
+
+- **Scenes:** *Mountain lake* (default), *Forest grove*, *Candle night*.
+- **Light follows the session:** dawn while arriving, brightest in stillness, dusk while returning.
+- **Bowl:** ripples on the water follow the audio level. Click the bowl to play or pause.
+- **Presets:** *Lake Calm*, *Forest Calm*, *Deep Bowls*, *Water Breath*, *Sleep*. A preset sets mode, character, layer levels and scene. Key and seed stay.
+- All other settings are in the **Settings** drawer.
+- `prefers-reduced-motion` is respected.
+
+See `docs/design-concept.md` for the full concept.
 
 ## Controls
 
@@ -44,6 +57,6 @@ Options: `--minutes`, `--seed`, `--key`, `--mode`, `--movement`, `--density`, `-
 
 ## Files
 
-- `index.html` — UI (play, settings, mixer, visuals, export)
+- `index.html` — UI (scenes, singing bowl, presets, settings drawer, export)
 - `engine.js` — sound engine (runs in the browser and in Node)
 - `tools/render.mjs` — command-line renderer
