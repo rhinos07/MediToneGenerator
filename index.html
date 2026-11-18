@@ -23,8 +23,7 @@
       --text:        rgba(246,231,200,0.92);
       --text-soft:   rgba(246,231,200,0.68);
       --text-faint:  rgba(246,231,200,0.46);
-      --glass-bg:    rgba(20,24,18,0.55);
-      --glass-line:  rgba(232,194,122,0.18);
+        --glass-line:  rgba(232,194,122,0.18);
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { min-height: 100%; }
@@ -111,8 +110,8 @@
     .presets { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; max-width: 520px; }
     .chip {
       font-size: 0.72rem; letter-spacing: 0.08em; padding: 0.45rem 0.95rem; border-radius: 999px; cursor: pointer;
-      color: var(--text-soft); background: rgba(20,24,18,0.5); border: 1px solid var(--glass-line);
-      -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); transition: background .3s, color .3s;
+      color: var(--text-soft); background: rgba(20,24,18,0.72); border: 1px solid var(--glass-line);
+      transition: background .3s, color .3s;
     }
     .chip:hover { color: var(--text); background: rgba(40,44,30,0.6); }
     .chip[aria-pressed="true"] { color: #2a1c0c; background: var(--brass-light); border-color: var(--brass-light); }
@@ -122,15 +121,13 @@
       position: fixed; left: 50%; bottom: 1.2rem; transform: translateX(-50%); z-index: 3;
       font-size: 0.68rem; letter-spacing: 0.26em; text-transform: uppercase; color: var(--text-soft);
       padding: 0.6rem 1.3rem; border-radius: 999px; cursor: pointer;
-      background: var(--glass-bg); border: 1px solid var(--glass-line);
-      -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+      background: rgba(20,24,18,0.75); border: 1px solid var(--glass-line);
     }
     .backdrop { position: fixed; inset: 0; z-index: 4; background: rgba(0,0,0,0.25); opacity: 0; pointer-events: none; transition: opacity .4s; }
     .backdrop.open { opacity: 1; pointer-events: auto; }
     .drawer {
       position: fixed; z-index: 5; right: 0; top: 0; bottom: 0; width: min(400px, 100vw);
-      background: rgba(16,20,15,0.82); border-left: 1px solid var(--glass-line);
-      -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px);
+      background: rgba(16,20,15,0.95); border-left: 1px solid var(--glass-line);
       padding: 1.6rem 1.5rem 2rem; overflow-y: auto; visibility: hidden;
       transform: translateX(105%); transition: transform .5s cubic-bezier(.2,.8,.2,1), visibility 0s .5s;
     }
@@ -292,6 +289,7 @@
         <button class="sc-night" data-scene="night">Candle night</button>
       </div>
       <p class="hint">The light follows the session: dawn while arriving, brightest in stillness, dusk at the end.</p>
+      <label class="check"><input type="checkbox" id="chkEco"> Eco mode · still scene, less CPU and battery</label>
     </section>
 
     <section class="group">
@@ -371,6 +369,9 @@
   const E = window.MediToneEngine;
   const $ = id => document.getElementById(id);
   const MUTE = E.MUTE_DB;
+  const RENDER_SCALE = 0.5;      // scene canvas resolution relative to CSS pixels
+  const SCENE_FPS = 30;          // scene redraw rate (smooth enough for slow motion)
+  const ECO_INTERVAL = 2000;     // eco mode / reduced motion: redraw every 2 s
   const REDUCED_MOTION = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // Display order, colours and UI labels of the sound layers ("ocean" is shown as "Water")
@@ -431,7 +432,7 @@
       movement: 0.5, density: 0.5, reverb: 0.6, beat: 4,
       levels: Object.assign({}, E.DEFAULT_LEVELS),
       scene: 'lake', preset: 'lakeCalm',
-      breath: 'calm', chime: false,
+      breath: 'calm', chime: false, eco: false,
     },
   };
 
@@ -521,6 +522,7 @@
     });
     $('selBreath').addEventListener('change', e => { S.cfg.breath = e.target.value; guide.restart(); saveSettings(); });
     $('chkChime').addEventListener('change', e => { S.cfg.chime = e.target.checked; guide.restart(); saveSettings(); });
+    $('chkEco').addEventListener('change', e => { S.cfg.eco = e.target.checked; saveSettings(); });
     $('btnExport').addEventListener('click', exportWav);
     $('playBtn').addEventListener('click', togglePlay);
     $('bowl').addEventListener('click', togglePlay);
@@ -550,6 +552,7 @@
     $('selBeat').value = c.beat;
     $('selBreath').value = c.breath;
     $('chkChime').checked = !!c.chime;
+    $('chkEco').checked = !!c.eco;
     for (const ch of CHARACTER) setSlider('ch-' + ch.key, c[ch.key]);
     for (const [key] of LAYER_UI) setSlider('mx-' + key, c.levels[key]);
     document.querySelectorAll('#presets .chip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.preset === c.preset)));
@@ -687,12 +690,17 @@
     return { ts: 0, p: null, phase: '' };
   }
 
-  let lastPhase = null;
+  let lastPhase = null, lastTime = null, lastBar = null;
   function updateTransport(info) {
-    const total = S.cfg.duration, active = S.playing || S.elapsed > 0;
-    $('timeText').textContent = active ? (isFinite(total) ? `${fmt(info.ts)} / ${fmt(total)}` : fmt(info.ts)) : '';
-    $('progress').style.visibility = active && isFinite(total) ? 'visible' : 'hidden';
-    $('progressFill').style.width = active && isFinite(total) ? (Math.min(1, info.ts / total) * 100).toFixed(2) + '%' : '0';
+    const total = S.cfg.duration, active = S.playing || S.elapsed > 0, bar = active && isFinite(total);
+    const time = active ? (isFinite(total) ? `${fmt(info.ts)} / ${fmt(total)}` : fmt(info.ts)) : '';
+    if (time !== lastTime) { lastTime = time; $('timeText').textContent = time; }
+    const width = bar ? (Math.min(1, info.ts / total) * 100).toFixed(1) + '%' : '0';
+    if (width + bar !== lastBar) {
+      lastBar = width + bar;
+      $('progress').style.visibility = bar ? 'visible' : 'hidden';
+      $('progressFill').style.width = width;
+    }
     const phase = active ? info.phase : '';
     if (phase !== lastPhase) {
       lastPhase = phase;
@@ -769,7 +777,10 @@
     const rnd = (a, b) => a + Math.random() * (b - a);
 
     function build() {
-      W = c.width = innerWidth; H = c.height = innerHeight;
+      W = innerWidth; H = innerHeight;
+      // Render at half resolution: 4x fewer pixels to fill, the soft scene looks the same when scaled up
+      c.width = Math.ceil(W * RENDER_SCALE); c.height = Math.ceil(H * RENDER_SCALE);
+      g.setTransform(RENDER_SCALE, 0, 0, RENDER_SCALE, 0, 0);
       trees = [];
       [[0.45, 'rgba(120,120,70,0.35)', 14, 6, 14], [0.7, 'rgba(55,65,40,0.65)', 9, 12, 26], [1, 'rgba(20,28,20,0.92)', 6, 22, 46]]
         .forEach(([depth, col, n, wMin, wMax]) => {
@@ -1060,8 +1071,9 @@
       ripples(now);
       guide.frame();
       light += (targetLight(info.p) - light) * 0.01;   // smooth, slow change of light
-      // reduced motion: redraw the scene only every 2 s
-      if (REDUCED_MOTION && now - lastScene < 2000) return;
+      // limit scene redraws; eco mode and reduced motion redraw only every 2 s
+      const interval = (REDUCED_MOTION || S.cfg.eco) ? ECO_INTERVAL : 1000 / SCENE_FPS;
+      if (now - lastScene < interval - 2) return;
       lastScene = now;
       sceneRenderer(now / 1000, light);
     }

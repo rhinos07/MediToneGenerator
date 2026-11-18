@@ -36,7 +36,7 @@ The main screen shows a singing bowl in a calm natural scene. All scenes are dra
 - **Presets:** *Lake Calm*, *Forest Calm*, *Deep Bowls*, *Water Breath*, *Sleep*. A preset sets mode, character, layer levels and scene. Key and seed stay.
 - **Breathing guide:** the cue switches between *breathe in*, *hold* and *breathe out*. Bowl and halo grow and sink with the breath, a thin ring fills during each step. Patterns: *Calm 4–6* (default), *4–7–8*, *Box 4–4–4–4*, *Off*. An optional soft bowl chime marks each in/out change (also when the tab is in the background). The chime is not part of the WAV export.
 - All other settings are in the **Settings** drawer.
-- `prefers-reduced-motion` is respected.
+- **Performance:** the scene renders at half resolution and max. 30 fps. *Eco mode* (settings → Scene) keeps the scene still and redraws it only every 2 s; use it on slow notebooks or on battery. `prefers-reduced-motion` uses the same still mode.
 
 See `docs/design-concept.md` for the full concept.
 
