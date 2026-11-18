@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MediTone — Design Mockup "Singing Bowl Grove"</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,400&family=Inter:wght@300;400;500&display=swap');
+
+  /* Design tokens (see docs/design-concept.md) */
+  :root {
+    --forest-deep:  #0f1712;
+    --forest:       #1d2a20;
+    --moss:         #4f6140;
+    --sage:         #9fae8a;
+    --brass:        #c9973f;
+    --brass-light:  #e8c27a;
+    --bronze:       #8a5a2b;
+    --candle:       #f6e7c8;
+    --sunlight:     #ffd79a;
+    --lavender:     #a990c9;
+    --stone:        #8d8a7f;
+    --water:        #16201d;
+    --text:         rgba(246,231,200,0.92);
+    --text-soft:    rgba(246,231,200,0.62);
+    --text-faint:   rgba(246,231,200,0.40);
+    --glass-bg:     rgba(20,24,18,0.55);
+    --glass-line:   rgba(232,194,122,0.16);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif; color: var(--text);
+    background: var(--forest-deep); overflow-x: hidden;
+  }
+  #scene { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; }
+
+  .stage {
+    position: relative; z-index: 1; min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 1.4rem; padding: 2rem 1rem 7rem;
+  }
+
+  /* Brand */
+  .brand { text-align: center; }
+  .brand h1 {
+    font-family: 'Cormorant Garamond', serif; font-weight: 300; font-size: 2.8rem; letter-spacing: 0.06em;
+    color: var(--candle); text-shadow: 0 0 30px rgba(255,215,154,0.35);
+  }
+  .brand p { font-size: 0.66rem; letter-spacing: 0.38em; text-transform: uppercase; color: var(--text-faint); }
+
+  /* Singing bowl */
+  .bowl-wrap { position: relative; width: 300px; height: 260px; display: grid; place-items: center; }
+  .bowl-wrap svg { overflow: visible; }
+  .halo {
+    position: absolute; width: 260px; height: 260px; border-radius: 50%; top: -10px;
+    background: radial-gradient(circle, rgba(255,215,154,0.28) 0%, rgba(255,215,154,0.08) 40%, transparent 70%);
+    animation: breathe 9s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%,100% { transform: scale(0.92); opacity: 0.55; }
+    45%,55% { transform: scale(1.12); opacity: 1; }
+  }
+  .ripple { fill: none; stroke: var(--brass-light); transform-origin: 150px 92px; animation: ripple 6s ease-out infinite; opacity: 0; }
+  .ripple.r2 { animation-delay: 2s; } .ripple.r3 { animation-delay: 4s; }
+  @keyframes ripple {
+    0% { transform: scale(0.25); opacity: 0.7; stroke-width: 1.4; }
+    100% { transform: scale(1.9); opacity: 0; stroke-width: 0.3; }
+  }
+  .breath {
+    position: absolute; bottom: -6px; width: 100%; text-align: center;
+    font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 1.15rem; color: var(--candle); text-shadow: 0 1px 8px rgba(0,0,0,0.6);
+    animation: breathText 9s ease-in-out infinite;
+  }
+  @keyframes breathText { 0%,100% { opacity: 0.35; } 45%,55% { opacity: 0.95; } }
+
+  /* Transport */
+  .transport { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; }
+  .play {
+    width: 72px; height: 72px; border-radius: 50%; border: 1px solid rgba(232,194,122,0.55); cursor: pointer;
+    color: #2a1c0c; display: grid; place-items: center;
+    background: radial-gradient(circle at 35% 30%, #f3d496 0%, var(--brass) 45%, var(--bronze) 100%);
+    box-shadow: 0 0 0 6px rgba(232,194,122,0.08), 0 8px 30px rgba(201,151,63,0.35), inset 0 -4px 10px rgba(0,0,0,0.25);
+    transition: transform .25s cubic-bezier(.34,1.56,.64,1);
+  }
+  .play:hover { transform: scale(1.06); }
+  .play svg { width: 26px; height: 26px; }
+  .phase { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem 1.1rem; font-size: 0.6rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--text-faint); }
+  .phase span.on { color: var(--brass-light); }
+  .time { font-variant-numeric: tabular-nums; font-size: 0.8rem; letter-spacing: 0.12em; color: var(--text-soft); }
+  .progress { width: 220px; height: 2px; border-radius: 2px; background: rgba(246,231,200,0.12); overflow: hidden; }
+  .progress i { display: block; height: 100%; width: 38%; background: linear-gradient(90deg, var(--brass), var(--sunlight)); }
+
+  /* Quick presets */
+  .presets { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
+  .chip {
+    font-size: 0.7rem; letter-spacing: 0.08em; padding: 0.45rem 0.9rem; border-radius: 999px; cursor: pointer;
+    color: var(--text-soft); background: rgba(20,24,18,0.45); border: 1px solid var(--glass-line);
+    backdrop-filter: blur(10px);
+  }
+  .chip.on { color: #2a1c0c; background: var(--brass-light); border-color: var(--brass-light); }
+
+  /* Settings drawer */
+  .drawer-btn {
+    position: fixed; left: 50%; bottom: 1.2rem; transform: translateX(-50%); z-index: 3;
+    font-size: 0.68rem; letter-spacing: 0.26em; text-transform: uppercase; color: var(--text-soft);
+    padding: 0.6rem 1.3rem; border-radius: 999px; cursor: pointer;
+    background: var(--glass-bg); border: 1px solid var(--glass-line); backdrop-filter: blur(14px);
+  }
+  .drawer {
+    position: fixed; z-index: 4; right: 0; top: 0; bottom: 0; width: min(400px, 100vw);
+    background: rgba(16,20,15,0.78); border-left: 1px solid var(--glass-line);
+    backdrop-filter: blur(24px) saturate(1.1); -webkit-backdrop-filter: blur(24px) saturate(1.1);
+    padding: 1.6rem 1.5rem 2rem; overflow-y: auto;
+    transform: translateX(0); transition: transform .5s cubic-bezier(.2,.8,.2,1);
+  }
+  .drawer.closed { transform: translateX(105%); }
+  .drawer h2 {
+    font-family: 'Cormorant Garamond', serif; font-weight: 400; font-size: 1.5rem; color: var(--candle);
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;
+  }
+  .drawer h2 button { background: none; border: 0; color: var(--text-faint); font-size: 1.3rem; cursor: pointer; }
+  .group { margin-bottom: 1.6rem; }
+  .group-title {
+    font-size: 0.62rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--brass-light);
+    opacity: 0.8; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.6rem;
+  }
+  .group-title::after { content: ''; flex: 1; height: 1px; background: var(--glass-line); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
+  .lbl { display: block; font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-faint); margin-bottom: 0.3rem; }
+  .field {
+    width: 100%; font: inherit; font-size: 0.82rem; color: var(--text); padding: 0.45rem 0.6rem; border-radius: 0.7rem;
+    background: rgba(246,231,200,0.05); border: 1px solid var(--glass-line); outline: none;
+  }
+  .field option { background: var(--forest); }
+  .row { margin-bottom: 0.95rem; }
+  .row-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.4rem; }
+  .row-head b { font-weight: 400; font-size: 0.86rem; color: var(--text); display: flex; align-items: center; gap: 0.5rem; }
+  .row-head small { font-size: 0.6rem; color: var(--text-faint); letter-spacing: 0.06em; }
+  .row-head b i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); box-shadow: 0 0 6px var(--c); }
+  input[type=range] {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 3px; border-radius: 3px; outline: none;
+    background: linear-gradient(to right, var(--c) var(--v), rgba(246,231,200,0.12) var(--v));
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--forest-deep);
+    background: radial-gradient(circle at 35% 30%, #f6dca6, var(--brass)); box-shadow: 0 0 8px rgba(232,194,122,0.6);
+  }
+  input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border-radius: 50%; background: var(--brass); border: 2px solid var(--forest-deep); }
+  .btn {
+    font: inherit; font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; cursor: pointer;
+    padding: 0.6rem 1rem; border-radius: 0.8rem; color: var(--candle);
+    background: rgba(201,151,63,0.16); border: 1px solid rgba(232,194,122,0.35); width: 100%;
+  }
+  .note { font-size: 0.64rem; color: var(--text-faint); margin-top: 0.5rem; text-align: center; line-height: 1.5; }
+  .scene-pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+  .scene-pick div {
+    height: 54px; border-radius: 0.7rem; border: 1px solid var(--glass-line); position: relative; cursor: pointer;
+    font-size: 0.58rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--candle);
+    display: flex; align-items: flex-end; padding: 0.35rem 0.45rem;
+  }
+  .scene-pick div.on { outline: 2px solid var(--brass-light); outline-offset: 2px; }
+  .sc-grove { background: linear-gradient(160deg, #f4c27a 0%, #6b6a3c 45%, #1d2a20 100%); }
+  .sc-lake  { background: linear-gradient(180deg, #3d5a73 0%, #f3cf8f 48%, #ffe2a8 50%, #1e3640 100%); }
+  .sc-night { background: linear-gradient(160deg, #3b2f5c 0%, #1a1730 55%, #0b0a14 100%); }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<main class="stage">
+  <header class="brand">
+    <h1>MediTone</h1>
+    <p>Generative meditation sound</p>
+  </header>
+
+  <!-- Singing bowl: the central visual. Ripples on the water surface react to the audio. -->
+  <div class="bowl-wrap" aria-hidden="true">
+    <div class="halo"></div>
+    <svg width="300" height="230" viewBox="0 0 300 230">
+      <defs>
+        <linearGradient id="bowlBody" x1="0" x2="1">
+          <stop offset="0" stop-color="#6b4320"/>
+          <stop offset="0.28" stop-color="#c9973f"/>
+          <stop offset="0.45" stop-color="#f3d496"/>
+          <stop offset="0.62" stop-color="#b9842f"/>
+          <stop offset="1" stop-color="#4e3015"/>
+        </linearGradient>
+        <radialGradient id="bowlInner" cx="0.5" cy="0.4" r="0.7">
+          <stop offset="0" stop-color="#3a2a14"/>
+          <stop offset="0.7" stop-color="#7a5524"/>
+          <stop offset="1" stop-color="#d7a957"/>
+        </radialGradient>
+        <radialGradient id="water" cx="0.45" cy="0.4" r="0.6">
+          <stop offset="0" stop-color="#ffe2a8" stop-opacity="0.55"/>
+          <stop offset="1" stop-color="#2a1c0c" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="cushion" cx="0.5" cy="0.3" r="0.7">
+          <stop offset="0" stop-color="#7b3b2a"/>
+          <stop offset="1" stop-color="#3a1a12"/>
+        </radialGradient>
+        <clipPath id="rim"><ellipse cx="150" cy="92" rx="104" ry="28"/></clipPath>
+      </defs>
+      <!-- shadow -->
+      <ellipse cx="150" cy="208" rx="120" ry="14" fill="rgba(0,0,0,0.45)"/>
+      <!-- cushion -->
+      <ellipse cx="150" cy="190" rx="98" ry="22" fill="url(#cushion)"/>
+      <!-- body -->
+      <path d="M46 92 C 50 160, 95 192, 150 192 C 205 192, 250 160, 254 92 Z" fill="url(#bowlBody)"/>
+      <!-- engraved band -->
+      <path d="M58 122 C 90 140, 210 140, 242 122" stroke="rgba(60,35,10,0.45)" stroke-width="1.2" fill="none"/>
+      <path d="M62 130 C 95 147, 205 147, 238 130" stroke="rgba(255,225,160,0.25)" stroke-width="0.8" fill="none"/>
+      <!-- rim + inner -->
+      <ellipse cx="150" cy="92" rx="106" ry="30" fill="#e6bd72"/>
+      <ellipse cx="150" cy="92" rx="104" ry="28" fill="url(#bowlInner)"/>
+      <g clip-path="url(#rim)">
+        <ellipse cx="150" cy="92" rx="104" ry="28" fill="url(#water)"/>
+        <ellipse class="ripple"    cx="150" cy="92" rx="54" ry="14"/>
+        <ellipse class="ripple r2" cx="150" cy="92" rx="54" ry="14"/>
+        <ellipse class="ripple r3" cx="150" cy="92" rx="54" ry="14"/>
+      </g>
+      <!-- specular -->
+      <path d="M84 110 C 88 150, 110 172, 128 178" stroke="rgba(255,240,205,0.5)" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <!-- mallet -->
+      <g transform="rotate(-28 232 60)">
+        <rect x="200" y="54" width="92" height="11" rx="5.5" fill="#8a5a2b"/>
+        <rect x="200" y="54" width="34" height="11" rx="5.5" fill="#5b3a1d"/>
+        <rect x="270" y="55" width="22" height="9" rx="4.5" fill="rgba(255,230,180,0.25)"/>
+      </g>
+    </svg>
+    <div class="breath">breathe in … and let go</div>
+  </div>
+
+  <div class="transport">
+    <button class="play" aria-label="Pause">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+    </button>
+    <div class="time">11:24 / 30:00</div>
+    <div class="progress"><i></i></div>
+    <div class="phase"><span>Arriving</span><span class="on">Deepening</span><span>Stillness</span><span>Returning</span></div>
+  </div>
+
+  <nav class="presets" aria-label="Quick presets">
+    <span class="chip on">Forest Calm</span>
+    <span class="chip">Deep Bowls</span>
+    <span class="chip">Ocean Breath</span>
+    <span class="chip">Sleep</span>
+  </nav>
+</main>
+
+<button class="drawer-btn" onclick="document.querySelector('.drawer').classList.toggle('closed')">⚙ Settings</button>
+
+<aside class="drawer closed" aria-label="Settings">
+  <h2>Settings <button onclick="this.closest('.drawer').classList.add('closed')" aria-label="Close">×</button></h2>
+
+  <section class="group">
+    <div class="group-title">Scene</div>
+    <div class="scene-pick">
+      <div class="sc-grove on" data-scene="grove">Forest grove</div>
+      <div class="sc-lake" data-scene="lake">Mountain lake</div>
+      <div class="sc-night" data-scene="night">Candle night</div>
+    </div>
+  </section>
+
+  <section class="group">
+    <div class="group-title">Session</div>
+    <div class="grid2">
+      <label><span class="lbl">Duration</span><select class="field"><option>30 min</option></select></label>
+      <label><span class="lbl">Mood / Mode</span><select class="field"><option>Dorian</option></select></label>
+      <label><span class="lbl">Key</span><select class="field"><option>D</option></select></label>
+      <label><span class="lbl">Seed</span><input class="field" value="lotus-108"></label>
+    </div>
+  </section>
+
+  <section class="group">
+    <div class="group-title">Character</div>
+    <div class="row" style="--c:#e8c27a;--v:50%"><div class="row-head"><b><i></i>Movement</b><small>pad voices shift</small></div><input type="range" value="50"></div>
+    <div class="row" style="--c:#9fae8a;--v:45%"><div class="row-head"><b><i></i>Density</b><small>how often melodies appear</small></div><input type="range" value="45"></div>
+    <div class="row" style="--c:#a990c9;--v:60%"><div class="row-head"><b><i></i>Space</b><small>hall reverb</small></div><input type="range" value="60"></div>
+  </section>
+
+  <section class="group">
+    <div class="group-title">Sound layers</div>
+    <div class="row" style="--c:#c9973f;--v:80%"><div class="row-head"><b><i></i>Singing bowls</b><small>struck · rubbed</small></div><input type="range" value="80"></div>
+    <div class="row" style="--c:#8a5a2b;--v:65%"><div class="row-head"><b><i></i>Drone</b><small>root + fifth</small></div><input type="range" value="65"></div>
+    <div class="row" style="--c:#9fae8a;--v:55%"><div class="row-head"><b><i></i>Pad</b><small>voice-led</small></div><input type="range" value="55"></div>
+    <div class="row" style="--c:#d7c49e;--v:40%"><div class="row-head"><b><i></i>Flutes</b><small>bansuri · shakuhachi</small></div><input type="range" value="40"></div>
+    <div class="row" style="--c:#7fa39a;--v:45%"><div class="row-head"><b><i></i>Handpan</b><small>modal</small></div><input type="range" value="45"></div>
+    <div class="row" style="--c:#b0766a;--v:0%"><div class="row-head"><b><i></i>Tanpura</b><small>off</small></div><input type="range" value="0"></div>
+    <div class="row" style="--c:#6f8f9a;--v:50%"><div class="row-head"><b><i></i>Water</b><small>stream · waves</small></div><input type="range" value="50"></div>
+    <div class="row" style="--c:#a990c9;--v:30%"><div class="row-head"><b><i></i>Binaural</b><small>4 Hz theta · headphones</small></div><input type="range" value="30"></div>
+  </section>
+
+  <section class="group">
+    <div class="group-title">Export</div>
+    <button class="btn">Render WAV</button>
+    <p class="note">Renders the session offline with the current settings (max 20 min).</p>
+  </section>
+</aside>
+
+<script>
+/* Mockup only: procedural scenes (no photos). The scene is chosen in the settings drawer.
+   grove = forest clearing at golden hour, lake = mountain lake at sunrise with mirror reflection,
+   night = candle-lit night. All scenes share: sun/candle glow, drifting light motes, vignette. */
+(function () {
+  const c = document.getElementById('scene'), g = c.getContext('2d');
+  let W, H, scene = 'grove', trees = [], motes = [], ridges = [], stars = [];
+  const rnd = (a, b) => a + Math.random() * (b - a);
+
+  function build() {
+    W = c.width = innerWidth; H = c.height = innerHeight;
+    trees = [];
+    [[0.45, 'rgba(120,120,70,0.35)', 14, 6, 14], [0.7, 'rgba(55,65,40,0.65)', 9, 12, 26], [1, 'rgba(20,28,20,0.92)', 6, 22, 46]]
+      .forEach(([depth, col, n, wMin, wMax]) => {
+        for (let i = 0; i < n; i++) trees.push({ x: rnd(-0.05, 1.05) * W, w: rnd(wMin, wMax) * depth, col, lean: rnd(-0.03, 0.03) });
+      });
+    // mountain ridges: far (hazy, snowy) -> near (dark)
+    ridges = [
+      { base: 0.50, amp: 0.26, col: '#8c8fa0', snow: 0.55, pts: ridge(9) },
+      { base: 0.50, amp: 0.17, col: '#4d4a46', snow: 0.25, pts: ridge(7) },
+      { base: 0.50, amp: 0.08, col: '#2b2a24', snow: 0,    pts: ridge(11) },
+    ];
+    motes = Array.from({ length: 70 }, () => ({ x: rnd(0, W), y: rnd(0, H * 0.8), r: rnd(0.6, 2.4), s: rnd(0.05, 0.25), p: rnd(0, 6.28) }));
+    stars = Array.from({ length: 160 }, () => ({ x: rnd(0, W), y: rnd(0, H * 0.6), r: rnd(0.3, 1.2), p: rnd(0, 6.28) }));
+  }
+  function ridge(n) { // jagged peaks with a valley in the middle where the sun rises
+    return Array.from({ length: n + 1 }, (_, i) => {
+      const x = i / n, valley = 1 - 0.75 * Math.exp(-Math.pow((x - 0.5) / 0.13, 2));
+      return [x, valley * rnd(0.45, 1)];
+    });
+  }
+
+  function candle(x, y, s, t, i) {
+    const f = 1 + 0.15 * Math.sin(t * 7 + i * 3) + 0.08 * Math.sin(t * 13 + i);
+    const gl = g.createRadialGradient(x, y - 30 * s, 0, x, y - 30 * s, 80 * s * f);
+    gl.addColorStop(0, 'rgba(255,190,110,0.6)'); gl.addColorStop(1, 'rgba(255,190,110,0)');
+    g.fillStyle = gl; g.fillRect(x - 100 * s, y - 120 * s, 200 * s, 200 * s);
+    const wax = g.createLinearGradient(x - 12 * s, 0, x + 12 * s, 0);
+    wax.addColorStop(0, '#c9b089'); wax.addColorStop(0.4, '#fbeed2'); wax.addColorStop(1, '#a88e66');
+    g.fillStyle = wax; g.fillRect(x - 12 * s, y - 22 * s, 24 * s, 34 * s);
+    g.fillStyle = '#fff6dc'; g.beginPath(); g.ellipse(x, y - 30 * s, 3 * s, 7 * s * f, 0, 0, 6.28); g.fill();
+  }
+  function motesLayer(t, col) {
+    motes.forEach(m => {
+      m.y -= m.s; m.x += Math.sin(t * 0.4 + m.p) * 0.15;
+      if (m.y < -5) { m.y = H * 0.8; m.x = rnd(0, W); }
+      g.fillStyle = `rgba(${col},${0.25 + 0.35 * (0.5 + 0.5 * Math.sin(t * 1.3 + m.p))})`;
+      g.beginPath(); g.arc(m.x, m.y, m.r, 0, 6.28); g.fill();
+    });
+  }
+  function vignette(a) {
+    const v = g.createRadialGradient(W / 2, H * 0.45, Math.min(W, H) * 0.2, W / 2, H * 0.45, Math.max(W, H) * 0.75);
+    v.addColorStop(0, 'rgba(10,14,10,0.12)'); v.addColorStop(1, `rgba(10,14,10,${a})`);
+    g.fillStyle = v; g.fillRect(0, 0, W, H);
+  }
+
+  /* ── Scene 1: forest grove ───────────────────── */
+  function grove(t) {
+    const horizon = H * 0.66, sunX = W * 0.72, sunY = H * 0.30;
+    let sky = g.createLinearGradient(0, 0, 0, horizon);
+    sky.addColorStop(0, '#5e6a46'); sky.addColorStop(0.45, '#c79a5a'); sky.addColorStop(1, '#f2c983');
+    g.fillStyle = sky; g.fillRect(0, 0, W, horizon);
+    let sun = g.createRadialGradient(sunX, sunY, 0, sunX, sunY, H * 0.7);
+    sun.addColorStop(0, 'rgba(255,240,200,0.95)'); sun.addColorStop(0.12, 'rgba(255,215,154,0.6)'); sun.addColorStop(1, 'rgba(255,215,154,0)');
+    g.fillStyle = sun; g.fillRect(0, 0, W, H);
+    trees.forEach(tr => {
+      g.fillStyle = tr.col; g.beginPath();
+      g.moveTo(tr.x - tr.w / 2, horizon + 4); g.lineTo(tr.x - tr.w / 2 + tr.lean * H, -10);
+      g.lineTo(tr.x + tr.w / 2 + tr.lean * H, -10); g.lineTo(tr.x + tr.w / 2, horizon + 4); g.fill();
+    });
+    let top = g.createLinearGradient(0, 0, 0, H * 0.35);
+    top.addColorStop(0, 'rgba(15,23,18,0.85)'); top.addColorStop(1, 'rgba(15,23,18,0)');
+    g.fillStyle = top; g.fillRect(0, 0, W, H * 0.35);
+    g.save(); g.globalCompositeOperation = 'screen';
+    for (let i = 0; i < 6; i++) {
+      const a = -2.2 + i * 0.16 + Math.sin(t * 0.05 + i) * 0.02;
+      g.fillStyle = `rgba(255,225,170,${0.05 + 0.03 * Math.sin(t * 0.3 + i * 2)})`;
+      g.beginPath(); g.moveTo(sunX, sunY);
+      g.lineTo(sunX + Math.cos(a) * W * 1.5, sunY - Math.sin(a) * H * 1.5);
+      g.lineTo(sunX + Math.cos(a + 0.05) * W * 1.5, sunY - Math.sin(a + 0.05) * H * 1.5); g.fill();
+    }
+    g.restore();
+    let wat = g.createLinearGradient(0, horizon - 20, 0, H);
+    wat.addColorStop(0, 'rgba(107,90,53,0)'); wat.addColorStop(0.08, '#6b5a35'); wat.addColorStop(0.3, '#2b2a1c'); wat.addColorStop(1, '#0f1410');
+    g.fillStyle = wat; g.fillRect(0, horizon - 20, W, H - horizon + 20);
+    shimmer(horizon, sunX, t, '255,220,160', 0.22);
+    g.fillStyle = 'rgba(10,14,10,0.9)';
+    g.beginPath(); g.moveTo(0, H * 0.82);
+    g.quadraticCurveTo(W * 0.3, H * 0.76, W * 0.55, H * 0.8); g.quadraticCurveTo(W * 0.8, H * 0.84, W, H * 0.79);
+    g.lineTo(W, H); g.lineTo(0, H); g.fill();
+    candle(W * 0.12, H * 0.84, 1, t, 0); candle(W * 0.17, H * 0.86, 0.8, t, 1); candle(W * 0.88, H * 0.85, 0.9, t, 2);
+    motesLayer(t, '255,230,170'); vignette(0.7);
+  }
+
+  /* ── Scene 2: mountain lake at sunrise ───────── */
+  function lakeUpper(horizon, sunX, t) {
+    let sky = g.createLinearGradient(0, 0, 0, horizon);
+    sky.addColorStop(0, '#3d5a73'); sky.addColorStop(0.55, '#a9b7b8'); sky.addColorStop(0.85, '#f3cf8f'); sky.addColorStop(1, '#ffe2a8');
+    g.fillStyle = sky; g.fillRect(0, 0, W, horizon);
+    let sun = g.createRadialGradient(sunX, horizon - 6, 0, sunX, horizon - 6, H * 0.55);
+    sun.addColorStop(0, 'rgba(255,248,225,1)'); sun.addColorStop(0.06, 'rgba(255,225,160,0.85)'); sun.addColorStop(0.35, 'rgba(255,200,120,0.18)'); sun.addColorStop(1, 'rgba(255,200,120,0)');
+    g.fillStyle = sun; g.fillRect(0, 0, W, horizon);
+    ridges.forEach(r => {
+      const pts = r.pts.map(([x, h]) => [x * W, horizon - h * r.amp * H]);
+      g.fillStyle = r.col; g.beginPath(); g.moveTo(0, horizon);
+      pts.forEach(([x, y]) => g.lineTo(x, y)); g.lineTo(W, horizon); g.fill();
+      if (r.snow) { // snow caps lit by the low sun
+        g.save(); g.clip();
+        const sn = g.createLinearGradient(0, horizon - r.amp * H, 0, horizon - r.amp * H * (1 - r.snow));
+        sn.addColorStop(0, 'rgba(255,244,225,0.9)'); sn.addColorStop(1, 'rgba(255,244,225,0)');
+        g.fillStyle = sn; g.fillRect(0, 0, W, horizon); g.restore();
+      }
+      // golden rim light on the ridge line
+      g.strokeStyle = 'rgba(255,215,154,0.35)'; g.lineWidth = 1.2; g.beginPath();
+      pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke();
+    });
+    // haze in the valley
+    let hz = g.createLinearGradient(0, horizon - H * 0.12, 0, horizon);
+    hz.addColorStop(0, 'rgba(255,225,170,0)'); hz.addColorStop(1, 'rgba(255,225,170,0.45)');
+    g.fillStyle = hz; g.fillRect(0, horizon - H * 0.12, W, H * 0.12);
+  }
+  function lake(t) {
+    const horizon = H * 0.5, sunX = W * 0.5;
+    lakeUpper(horizon, sunX, t);
+    // mirror reflection: redraw the upper half flipped, then tint it like water
+    g.save(); g.beginPath(); g.rect(0, horizon, W, H - horizon); g.clip();
+    g.translate(0, 2 * horizon); g.scale(1, -1); lakeUpper(horizon, sunX, t); g.restore();
+    let tint = g.createLinearGradient(0, horizon, 0, H);
+    tint.addColorStop(0, 'rgba(30,50,60,0.25)'); tint.addColorStop(1, 'rgba(12,22,28,0.75)');
+    g.fillStyle = tint; g.fillRect(0, horizon, W, H - horizon);
+    shimmer(horizon, sunX, t, '255,236,190', 0.35);
+    // stone ledge in the foreground
+    let st = g.createLinearGradient(0, H * 0.84, 0, H);
+    st.addColorStop(0, '#6d6457'); st.addColorStop(1, '#1d1a16');
+    g.fillStyle = st; g.beginPath(); g.moveTo(0, H * 0.9);
+    g.quadraticCurveTo(W * 0.25, H * 0.83, W * 0.5, H * 0.86); g.quadraticCurveTo(W * 0.75, H * 0.89, W, H * 0.84);
+    g.lineTo(W, H); g.lineTo(0, H); g.fill();
+    g.strokeStyle = 'rgba(255,220,160,0.35)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, H * 0.9);
+    g.quadraticCurveTo(W * 0.25, H * 0.83, W * 0.5, H * 0.86); g.quadraticCurveTo(W * 0.75, H * 0.89, W, H * 0.84); g.stroke();
+    motesLayer(t, '255,240,210'); vignette(0.55);
+  }
+
+  /* ── Scene 3: candle night ───────────────────── */
+  function night(t) {
+    let sky = g.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, '#120f22'); sky.addColorStop(0.6, '#241a33'); sky.addColorStop(1, '#0b0a12');
+    g.fillStyle = sky; g.fillRect(0, 0, W, H);
+    stars.forEach(s => {
+      g.fillStyle = `rgba(240,230,255,${0.15 + 0.4 * (0.5 + 0.5 * Math.sin(t * 0.8 + s.p))})`;
+      g.beginPath(); g.arc(s.x, s.y, s.r, 0, 6.28); g.fill();
+    });
+    g.fillStyle = '#0d0b10'; g.fillRect(0, H * 0.8, W, H * 0.2);
+    [[0.08, 0.86, 1.1], [0.14, 0.88, 0.8], [0.2, 0.85, 0.65], [0.8, 0.86, 0.75], [0.87, 0.88, 1.15], [0.93, 0.85, 0.7]]
+      .forEach(([x, y, s], i) => candle(W * x, H * y, s, t, i));
+    motesLayer(t, '255,200,140'); vignette(0.6);
+  }
+
+  function shimmer(horizon, sunX, t, col, a) {
+    for (let y = horizon + 3; y < H; y += 5) {
+      const k = (y - horizon) / (H - horizon);
+      const w = (40 + k * 160) * (0.6 + 0.4 * Math.sin(y * 0.3 + t * 1.2));
+      g.fillStyle = `rgba(${col},${a * (1 - k)})`;
+      g.fillRect(sunX - w / 2 + Math.sin(y * 0.1 + t) * 8, y, w, 1.5);
+    }
+  }
+
+  const SCENES = { grove, lake, night };
+  function draw(ms) { SCENES[scene](ms / 1000); requestAnimationFrame(draw); }
+  window.setScene = name => {
+    scene = name;
+    document.querySelectorAll('.scene-pick div').forEach(d => d.classList.toggle('on', d.dataset.scene === name));
+  };
+  document.querySelectorAll('.scene-pick div').forEach(d => d.addEventListener('click', () => setScene(d.dataset.scene)));
+  const q = new URLSearchParams(location.search).get('scene');
+  addEventListener('resize', build); build();
+  if (q && SCENES[q]) setScene(q);
+  requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>
